@@ -1,0 +1,6 @@
+mod-name: Tsunami Sim
+uuid: me.anno.tsunamis
+author: Antonio Noack
+description: Tsunami simulations for your game.
+main-class: me.anno.tsunamis.TsunamiSim
+version: 1.0.0
