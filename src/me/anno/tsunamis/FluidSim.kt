@@ -544,7 +544,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         }
     }
 
-    private fun computeMaxTimeStep(): Float {
+    fun computeMaxTimeStep(): Float {
         val width = width
         val height = height
         val h = fluidHeight
