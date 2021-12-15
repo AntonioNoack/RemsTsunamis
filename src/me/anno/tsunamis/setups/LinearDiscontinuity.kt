@@ -24,6 +24,12 @@ class LinearDiscontinuity : FluidSimSetup {
     @SerializedProperty
     var impulseRight = 0f
 
+    @SerializedProperty
+    var bathymetryLeft = 0f
+
+    @SerializedProperty
+    var bathymetryRight = 0f
+
     override fun getHeight(x: Int, y: Int, w: Int, h: Int): Float {
         val surface = if (x * 2 >= w) heightRight else heightLeft
         return max(surface - getBathymetry(x, y, w, h), 0f)
@@ -33,8 +39,8 @@ class LinearDiscontinuity : FluidSimSetup {
         return if (x * 2 >= w) impulseRight else impulseLeft
     }
 
-    override fun fillBathymetry(w: Int, h: Int, dst: FloatArray) {
-        dst.fill(0f)
+    override fun getBathymetry(x: Int, y: Int, w: Int, h: Int): Float {
+        return if (x * 2 >= w) bathymetryRight else bathymetryLeft
     }
 
     override fun fillMomentumY(w: Int, h: Int, dst: FloatArray) {

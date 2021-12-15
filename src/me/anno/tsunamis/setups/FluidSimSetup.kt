@@ -54,8 +54,12 @@ open class FluidSimSetup : Component() {
             val j = i + stride - 3
             height[i] = fh
             bathymetry[i] = bh
+            momentumX[i] = 0f
+            momentumY[i] = 0f
             height[j] = fh
             bathymetry[j] = bh
+            momentumX[j] = 0f
+            momentumY[j] = 0f
         }
     }
 
