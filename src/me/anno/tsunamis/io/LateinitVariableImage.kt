@@ -9,60 +9,38 @@ import java.awt.image.BufferedImage
 class LateinitVariableImage(val variableName: String, val file: FileReference) :
     Image(1, 1, 1, false) {
 
-    private var image: VariableImage? = null
-    private fun init() {
-        if (image == null) {
-            synchronized(this) {
-                if (image == null) {
-                    val data = NetCDFCache.loadFile(file, false)!!
-                    val variable = data.findVariable(variableName)!!
-                    val image = VariableImage(variable)
-                    width = image.width
-                    height = image.height
-                    this.image = image
-                }
-            }
-        }
+    private val image by lazy {
+        val data = NetCDFCache.loadFile(file, false)!!
+        val variable = data.findVariable(variableName)!!
+        val image = VariableImage(variable)
+        width = image.width
+        height = image.height
+        image
     }
+    override fun getWidth() = image.width
 
-    override fun getWidth(): Int {
-        init()
-        return image!!.getWidth()
-    }
+    override fun getHeight() = image.height
 
-    override fun getHeight(): Int {
-        init()
-        return image!!.getHeight()
-    }
-
-    override fun getRGB(p0: Int): Int {
-        init()
-        return image!!.getRGB(p0)
-    }
+    override fun getRGB(p0: Int) = image.getRGB(p0)
 
     override fun createBufferedImage(): BufferedImage {
-        init()
-        return image!!.createBufferedImage()
+        return image.createBufferedImage()
     }
 
     override fun createBufferedImage(dstWidth: Int, dstHeight: Int): BufferedImage {
-        init()
-        return image!!.createBufferedImage(dstWidth, dstHeight)
+        return image.createBufferedImage(dstWidth, dstHeight)
     }
 
     override fun createIntImage(): IntImage {
-        init()
-        return image!!.createIntImage()
+        return image.createIntImage()
     }
 
     override fun createRGBFrom3StridedData(texture: Texture2D?, checkRedundancy: Boolean, data: ByteArray?) {
-        init()
-        image!!.createRGBFrom3StridedData(texture, checkRedundancy, data)
+        image.createRGBFrom3StridedData(texture, checkRedundancy, data)
     }
 
     override fun createTexture(texture: Texture2D?, checkRedundancy: Boolean) {
-        init()
-        image!!.createTexture(texture, checkRedundancy)
+        image.createTexture(texture, checkRedundancy)
     }
 
 }
