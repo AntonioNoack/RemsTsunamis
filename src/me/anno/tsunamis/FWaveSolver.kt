@@ -1,17 +1,21 @@
 package me.anno.tsunamis
 
-import me.anno.tsunamis.setups.FluidSimSetup
-import me.anno.tsunamis.setups.LinearDamBreak
+import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference.Companion.getReference
+import me.anno.tsunamis.setups.FluidSimSetup
+import me.anno.tsunamis.setups.LinearDiscontinuity
 import org.apache.logging.log4j.LogManager
 import kotlin.math.abs
 import kotlin.math.sqrt
 
+/**
+ * solves the shallow water equations,
+ * also applies boundary conditions on dry-wet-boundaries
+ * */
 object FWaveSolver {
 
     private val LOGGER = LogManager.getLogger(FWaveSolver::class)
 
-    // SHALLOW_WATER_EQUATIONS // for tsunami-like waves, using the FWave solver
     fun solve(
         i0: Int, i1: Int,
         hSrc: FloatArray,
@@ -27,13 +31,13 @@ object FWaveSolver {
         var h0 = hSrc[i0]
         var h1 = hSrc[i1]
 
+        var b0 = b[i0]
+        var b1 = b[i1]
+
         val wet0 = h0 > 0f
         val wet1 = h1 > 0f
 
         if (wet0 || wet1) {
-
-            var b0 = b[i0]
-            var b1 = b[i1]
 
             var hu0 = huSrc[i0]
             var hu1 = huSrc[i1]
@@ -69,10 +73,6 @@ object FWaveSolver {
                 huDst[i1] -= scaling * tmp4f[3]
             }
 
-            /*if (tmp4f.any { it > 0f }) {
-                LOGGER.debug("$i0/$i1 -> $h0 $h1 $hu0 $hu1 $b0 $b1 x $gravity x $scaling = ${tmp4f.joinToString()} -> ${hDst[i0]} ${hDst[i1]}")
-            }*/
-
         }
     }
 
@@ -83,6 +83,7 @@ object FWaveSolver {
         gravity: Float,
         dst: FloatArray
     ) {
+        // println("input: $h0 $h1 $hu0 $hu1 $b0 $b1 $gravity")
         val roeHeight = (h0 + h1) * 0.5f
         val sqrt0 = sqrt(h0)
         val sqrt1 = sqrt(h1)
@@ -92,14 +93,15 @@ object FWaveSolver {
         val gravityTerm = sqrt(gravity * roeHeight)
         val lambda0 = roeVelocity - gravityTerm
         val lambda1 = roeVelocity + gravityTerm
-        val deltaLambda = 2f * gravityTerm
+        val invDeltaLambda = 0.5f / gravityTerm
         val bathymetryTermV2 = roeHeight * (b1 - b0)
         val df0 = hu1 - hu0
         val df1 = hu1 * u1 - hu0 * u0 + gravity * (0.5f * (h1 * h1 - h0 * h0) + bathymetryTermV2)
-        val deltaH0 = +(df0 * lambda1 - df1) / deltaLambda
-        val deltaH1 = -(df0 * lambda0 - df1) / deltaLambda
+        val deltaH0 = +(df0 * lambda1 - df1) * invDeltaLambda
+        val deltaH1 = -(df0 * lambda0 - df1) * invDeltaLambda
         val deltaHu0 = deltaH0 * lambda0
         val deltaHu1 = deltaH1 * lambda1
+        // println("dh: $deltaH0 $deltaH1 by $df0 $df1")
         if (lambda0 < 0f) {// first wave to the left
             dst[0] = deltaH0
             dst[1] = deltaHu0
@@ -118,12 +120,22 @@ object FWaveSolver {
             dst[2] += deltaH1
             dst[3] += deltaHu1
         }
+        if (dst.any { it.isNaN() }) {
+            dst.fill(0f)
+        }
+        // if (dst.any { it.isNaN() }) throw RuntimeException("NaN from $h0 $h1, $hu0 $hu1, $b0 $b1, $gravity")
     }
 
     @JvmStatic
     fun main(args: Array<String>) {
 
-        testWithHandselected()
+        testBorder()
+
+        testOutflow()
+
+        testNaN()
+
+        testWithHandSelected()
 
         testSmall()
 
@@ -131,30 +143,64 @@ object FWaveSolver {
 
     }
 
+    fun testBorder() {
+        val w = 100
+        val h = 50
+        val sim = FluidSim()
+        sim.width = w
+        sim.height = h
+        val setup = LinearDiscontinuity()
+        setup.heightLeft = 0.2f
+        setup.heightRight = 0.8f
+        setup.borderHeight = 1.0f
+        sim.setup = setup
+        sim.ensureFieldSize()
+        val height = sim.fluidHeight
+        ImageWriter.writeImageFloat(w + 2, h + 2, "border.png", false, height)
+    }
+
+    fun testOutflow() {
+        val w = 100
+        val h = 50
+        val sim = FluidSim()
+        sim.width = w
+        sim.height = h
+        val height = FloatArray((w + 2) * (h + 2))
+        for (i in height.indices) height[i] = Math.random().toFloat()
+        sim.setGhostOutflow(height)
+        ImageWriter.writeImageFloat(w + 2, h + 2, "outflow.png", false, height)
+    }
+
+    fun testNaN() {
+        val tmp = FloatArray(4)
+        solve(230.46196f, 6.285231E-22f, -55848.68f, -1828.01f, -497.51163f, -127.29645f, 9.81f, tmp)
+    }
+
     private fun testSmall() {
-        val prop = FluidSim()
-        prop.width = 100
-        prop.height = 1
-        val setup = LinearDamBreak()
-        setup.height0 = 10f
-        setup.height1 = 8f
-        prop.initWithSetup(setup)
-        prop.setGhostOutflow()
+        val sim = FluidSim()
+        sim.width = 100
+        sim.height = 1
+        val setup = LinearDiscontinuity()
+        setup.heightLeft = 10f
+        setup.heightRight = 8f
+        setup.hasBorder = false
+        sim.setup = setup
+        assert(sim.ensureFieldSize())
         val step = 0.1f
-        println((0 until 100).joinToString { prop.getFluidHeightAt(it, 0).toString() })
-        prop.computeStep(step)
-        println((0 until 100).joinToString { prop.getFluidHeightAt(it, 0).toString() })
+        println((0 until 100).joinToString { sim.getFluidHeightAt(it, 0).toString() })
+        sim.computeStep(step)
+        println((0 until 100).joinToString { sim.getFluidHeightAt(it, 0).toString() })
         for (i in 0 until 49) {
-            assert(prop.getFluidHeightAt(i, 0) == 10f)
-            assert(prop.getMomentumXAt(i, 0) == 0f)
+            assert(sim.getFluidHeightAt(i, 0) == 10f)
+            assert(sim.getMomentumXAt(i, 0) == 0f)
         }
-        assert(prop.getFluidHeightAt(49, 0), 10 - step * 9.394671362f, 0.01f)
-        assert(prop.getMomentumXAt(49, 0), step * 88.25985f, 0.01f)
-        assert(prop.getFluidHeightAt(50, 0), 8 + step * 9.394671362f, 0.01f)
-        assert(prop.getMomentumXAt(50, 0), step * 88.25985f, 0.01f)
+        assert(sim.getFluidHeightAt(49, 0), 10 - step * 9.394671362f, 0.01f)
+        assert(sim.getMomentumXAt(49, 0), step * 88.25985f, 0.01f)
+        assert(sim.getFluidHeightAt(50, 0), 8 + step * 9.394671362f, 0.01f)
+        assert(sim.getMomentumXAt(50, 0), step * 88.25985f, 0.01f)
         for (i in 51 until 100) {
-            assert(prop.getFluidHeightAt(i, 0), 8f, 1e-5f)
-            assert(prop.getMomentumXAt(i, 0), 0f, 1e-5f)
+            assert(sim.getFluidHeightAt(i, 0), 8f, 1e-5f)
+            assert(sim.getMomentumXAt(i, 0), 0f, 1e-5f)
         }
     }
 
@@ -166,7 +212,7 @@ object FWaveSolver {
         if (abs(a - b) > delta) throw RuntimeException("$a != $b, ${abs(a - b)} > $delta")
     }
 
-    private fun testWithHandselected() {
+    private fun testWithHandSelected() {
         // tests
         val dst = FloatArray(4)
         val g = 9.81f

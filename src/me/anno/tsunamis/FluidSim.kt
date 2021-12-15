@@ -1,11 +1,9 @@
 package me.anno.tsunamis
 
-import me.anno.ecs.annotations.DebugAction
-import me.anno.ecs.annotations.ExecuteInEditMode
-import me.anno.ecs.annotations.Range
-import me.anno.ecs.annotations.Type
+import me.anno.ecs.annotations.*
 import me.anno.ecs.components.mesh.ManualProceduralMesh
 import me.anno.ecs.components.mesh.ProceduralMesh
+import me.anno.ecs.components.mesh.terrain.TerrainUtils
 import me.anno.ecs.components.mesh.terrain.TerrainUtils.generateRegularQuadHeightMesh
 import me.anno.ecs.interfaces.CustomEditMode
 import me.anno.ecs.prefab.PrefabSaveable
@@ -13,19 +11,26 @@ import me.anno.engine.raycast.Raycast
 import me.anno.engine.ui.render.RenderView
 import me.anno.gpu.GFX
 import me.anno.input.Input
+import me.anno.io.files.FileReference
+import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.serialization.NotSerializedProperty
 import me.anno.io.serialization.SerializedProperty
-import me.anno.tsunamis.setups.CircularDamBreak
+import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
-import me.anno.utils.hpc.HeavyProcessing.processBalanced
+import me.anno.utils.hpc.ProcessingGroup
+import me.anno.utils.hpc.ThreadLocal2
 import me.anno.utils.maths.Maths.clamp
 import me.anno.utils.maths.Maths.mixARGB
+import org.apache.logging.log4j.LogManager
 import org.joml.Matrix4x3d
 import org.joml.Vector3d
+import org.joml.Vector3f
 import kotlin.math.*
 
 /**
  * simple 3d mesh, which simulates water
+ * todo where is that wall of momentum coming from?
+ * todo mirror y axis
  * */
 @ExecuteInEditMode
 class FluidSim : ProceduralMesh, CustomEditMode {
@@ -36,13 +41,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         base.copy(this)
     }
 
-    // todo apply force/brush on bathymetry
-    // todo apply force/brush on fluid depth
-
     // todo option to create border mesh for nicer looks
 
     @Type("ManualProceduralMesh/PrefabSaveable")
     var bathymetryMesh: ManualProceduralMesh? = null
+
+    @SerializedProperty
+    var colorMap: FileReference = defaultColorMap
 
     @NotSerializedProperty
     var wantsReset = false
@@ -53,9 +58,22 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         hasValidBathymetryMesh = false
     }
 
+    @DebugAction
+    fun invalidateBathymetryMesh() {
+        hasValidBathymetryMesh = false
+    }
+
+    @NotSerializedProperty
     var hasValidBathymetryMesh = false
 
-    // 0 = normal, 1 = momentum x, 2 = momentum y
+    @DebugProperty
+    var maxTimeStep = 0f
+
+    @DebugProperty
+    var maxVisualizedValue = 0f
+
+    // 0 = height map, 1 = momentum x, 2 = momentum y, 3 = water surface
+    @Range(0.0, 3.0)
     @SerializedProperty
     var visualization = 0
 
@@ -81,6 +99,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     var gravity = 9.81f
 
     @SerializedProperty
+    var timeFactor = 1f
+
+    @SerializedProperty
     var cellSizeMeters = 1f
         set(value) {
             if (field != value && value > 0f) {
@@ -93,6 +114,12 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @Range(0.0, 0.5)
     var cfl2d = 0.45f
 
+    @SerializedProperty
+    var computeTimeStepInterval = 0
+
+    @NotSerializedProperty
+    var timeStepIndex = 0
+
     val stride get() = width + 2
 
     @NotSerializedProperty
@@ -103,6 +130,22 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     @NotSerializedProperty
     private var tmpHuY = f0
+
+    /*@DebugProperty
+    val bathInfo: String
+        get() = "${bathymetry.minOrNull()} - ${bathymetry.maxOrNull()}, avg: ${bathymetry.average()}\n"
+
+    @DebugProperty
+    val heightInfo: String
+        get() = "${fluidHeight.minOrNull()} - ${fluidHeight.maxOrNull()}, avg: ${fluidHeight.average()}\n"
+
+    @DebugProperty
+    val impulseXInfo: String
+        get() = "${fluidMomentumX.minOrNull()} - ${fluidMomentumX.maxOrNull()}, avg: ${fluidMomentumX.average()}\n"
+
+    @DebugProperty
+    val impulseYInfo: String
+        get() = "${fluidMomentumY.minOrNull()} - ${fluidMomentumY.maxOrNull()}, avg: ${fluidMomentumY.average()}"*/
 
     fun getIndex(x: Int, y: Int): Int {
         val width = width
@@ -135,11 +178,33 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     // initialize using setups, just like in the Tsunami Lab module
     @Type("FluidSimSetup/PrefabSaveable")
-    var setup: FluidSimSetup? = CircularDamBreak()
+    var setup: FluidSimSetup? = null
+        set(value) {
+            if (field !== value) {
+                field = value
+                invalidateMesh()
+            }
+        }
 
-    private fun ensureFieldSize() {
-        val targetSize = (width + 2) * (height + 2)
-        if (fluidHeight.size != targetSize || wantsReset) {
+    @DebugAction
+    fun setSizeBySetup() {
+        val setup = setup
+        if (setup != null) {
+            if (setup.isReady()) {
+                width = setup.getPreferredNumCellsX()
+                height = setup.getPreferredNumCellsY()
+                wantsReset = true
+            } else LOGGER.warn("Setup isn't ready yet")
+        } else LOGGER.warn("No setup was found!")
+    }
+
+    fun ensureFieldSize(): Boolean {
+        val w = width
+        val h = height
+        val targetSize = (w + 2) * (h + 2)
+        return if (fluidHeight.size != targetSize || wantsReset) {
+            val setup = setup ?: return false
+            if (!setup.isReady()) return false
             wantsReset = false
             hasValidBathymetryMesh = false
             fluidHeight = FloatArray(targetSize)
@@ -149,69 +214,86 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             tmpHuX = FloatArray(targetSize)
             tmpHuY = FloatArray(targetSize)
             bathymetry = FloatArray(targetSize)
-            initWithSetup(setup ?: return)
-        }
+            setup.fillHeight(w, h, fluidHeight)
+            setup.fillBathymetry(w, h, bathymetry)
+            setup.fillMomentumX(w, h, fluidMomentumX)
+            setup.fillMomentumY(w, h, fluidMomentumY)
+            if (setup.hasBorder) {
+                setup.applyBorder(w, h, fluidHeight, bathymetry, fluidMomentumX, fluidMomentumY)
+            }
+            timeStepIndex = 0
+            maxTimeStep = computeMaxTimeStep()
+            true
+        } else true
     }
 
     fun initWithSetup(setup: FluidSimSetup) {
-        ensureFieldSize()
-        var i = 0
-        val w = width
-        val h = height
-        val h0 = fluidHeight
-        val hu = fluidMomentumX
-        val hv = fluidMomentumY
-        val b = bathymetry
-        for (y in -1..h) {
-            for (x in -1..w) {
-                h0[i] = setup.getHeight(x, y, w, h)
-                hu[i] = setup.getMomentumX(x, y, w, h)
-                hv[i] = setup.getMomentumY(x, y, w, h)
-                b[i] = setup.getBathymetry(x, y, w, h)
-                i++
-            }
+        if (ensureFieldSize()) {
+            val w = width
+            val h = height
+            setup.fillHeight(w, h, fluidHeight)
+            setup.fillBathymetry(w, h, bathymetry)
+            setup.fillMomentumX(w, h, fluidMomentumX)
+            setup.fillMomentumY(w, h, fluidMomentumY)
+            setGhostOutflow(bathymetry)
         }
     }
 
     override fun onUpdate(): Int {
-        ensureFieldSize()
-        try {
-            step(GFX.deltaTime)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        if (ensureFieldSize()) {
+            val dt = GFX.deltaTime * timeFactor
+            if (dt > 0f) {
+                try {
+                    step(dt)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            invalidateMesh()
+            // why is this function not called automatically?
+            if (GFX.isGFXThread()) ensureBuffer()
         }
-        invalidateMesh()
-        // why is this function not called automatically?
-        if (GFX.isGFXThread()) ensureBuffer()
         return 1 // update every tick
     }
 
     override fun generateMesh() {
-        mesh2.hasHighPrecisionNormals = true
-        val width = width
-        val height = height
-        if (fluidHeight.size == (width + 2) * (height + 2)) {
-            val bm = bathymetryMesh
-            if (!hasValidBathymetryMesh && bm != null) generateBathymetryMesh(bm)
-            generateFluidMesh(this)
-        } // else wait for simulation
+        if (ensureFieldSize()) {
+            mesh2.hasHighPrecisionNormals = true
+            val width = width
+            val height = height
+            if (fluidHeight.size == (width + 2) * (height + 2)) {
+                val bm = bathymetryMesh
+                if (!hasValidBathymetryMesh && bm != null) generateBathymetryMesh(bm)
+                generateFluidMesh(this)
+            } // else wait for simulation
+        }
     }
 
     private fun generateBathymetryMesh(mesh: ProceduralMesh) {
         hasValidBathymetryMesh = true
         val bathymetry = bathymetry
         val cellSizeMeters = cellSizeMeters
+        val colorMap = ColorMap.getMap(colorMap, false)
         generateRegularQuadHeightMesh(
             width + 2, height + 2, getIndex(-1, -1),
             stride, cellSizeMeters, mesh.mesh2,
-            { bathymetry[it] },
-            { x, y, _, dst ->
-                dst.x = getBathymetryAt(x + 1, y) - getBathymetryAt(x - 1, y)
-                dst.y = cellSizeMeters * 2f
-                dst.z = getBathymetryAt(x, y + 1) - getBathymetryAt(x, y - 1)
-                dst.normalize()
+            object : TerrainUtils.HeightMap {
+                override fun get(it: Int) = bathymetry[it]
             },
-            { getLandColor(bathymetry[it]) }
+            object : TerrainUtils.NormalMap {
+                override fun get(x: Int, y: Int, i: Int, dst: Vector3f) {
+                    dst.x = getBathymetryAt(x + 1, y) - getBathymetryAt(x - 1, y)
+                    dst.y = cellSizeMeters * 2f
+                    dst.z = getBathymetryAt(x, y + 1) - getBathymetryAt(x, y - 1)
+                    dst.normalize()
+                }
+            },
+            object : TerrainUtils.ColorMap {
+                override fun get(it: Int): Int {
+                    val height = bathymetry[it]
+                    return colorMap?.getColor(height) ?: getLandColor(height)
+                }
+            }
         )
     }
 
@@ -219,21 +301,89 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val bathymetry = bathymetry
         val fluidHeight = fluidHeight
         val cellSizeMeters = cellSizeMeters
-        val momentumScale = 1f / getMaxMomentum()
-        val getColor: (Int) -> Int = when (visualization) {
-            1 -> { it: Int -> getColor11(fluidMomentumX[it] * momentumScale) }
-            2 -> { it: Int -> getColor11(fluidMomentumY[it] * momentumScale) }
-            else -> this::getWaterColor
+        val colorMap = ColorMap.getMap(colorMap, false)
+        val fluidMomentumX = fluidMomentumX
+        val fluidMomentumY = fluidMomentumY
+        val getColor: TerrainUtils.ColorMap = when (visualization) {
+            1 -> {
+                val maxMomentum = getMaxMomentum()
+                maxVisualizedValue = maxMomentum
+                val momentumScale = 1f / max(maxMomentum, 1e-38f)
+                if (colorMap == null) object : TerrainUtils.ColorMap {
+                    override fun get(it: Int): Int = getColor11(fluidMomentumX[it] * momentumScale)
+                } else object : TerrainUtils.ColorMap {
+                    override fun get(it: Int): Int {
+                        val h = fluidHeight[it]
+                        return if (h > 0f) {// under water, surface color
+                            getColor11(fluidMomentumX[it] * momentumScale)
+                        } else colorMap.getColor(bathymetry[it]) // land color
+                    }
+                }
+            }
+            2 -> {
+                val maxMomentum = getMaxMomentum()
+                maxVisualizedValue = maxMomentum
+                val momentumScale = 1f / max(maxMomentum, 1e-38f)
+                if (colorMap == null) object : TerrainUtils.ColorMap {
+                    override fun get(it: Int): Int = getColor11(fluidMomentumY[it] * momentumScale)
+                } else object : TerrainUtils.ColorMap {
+                    override fun get(it: Int): Int {
+                        val h = fluidHeight[it]
+                        return if (h > 0f) {// under water, surface color
+                            getColor11(fluidMomentumY[it] * momentumScale)
+                        } else colorMap.getColor(bathymetry[it]) // land color
+                    }
+                }
+            }
+            3 -> {
+                var maxHeight = 0f
+                for (it in fluidHeight.indices) {
+                    val h = fluidHeight[it]
+                    if (h > 0f) {
+                        val s = abs(h + bathymetry[it])
+                        if (s > maxHeight) maxHeight = s
+                    }
+                }
+                maxVisualizedValue = maxHeight
+                val heightScale = 1f / max(1e-38f, maxHeight)
+                if (colorMap == null) object : TerrainUtils.ColorMap {
+                    override fun get(it: Int): Int = getColor11((fluidHeight[it] + bathymetry[it]) * heightScale)
+                } else object : TerrainUtils.ColorMap {
+                    override fun get(it: Int): Int {
+                        val h = fluidHeight[it]
+                        val b = bathymetry[it]
+                        return if (h > 0f) {// under water, surface color
+                            getColor11((h + b) * heightScale)
+                        } else colorMap.getColor(b) // land color
+                    }
+                }
+            }
+            else -> {
+                maxVisualizedValue = 0f
+                if (colorMap == null) getWaterColor
+                else object : TerrainUtils.ColorMap {
+                    override fun get(it: Int): Int {
+                        val h = fluidHeight[it]
+                        return if (h > 0f) {// under water, surface color
+                            colorMap.getColor(-h)
+                        } else colorMap.getColor(bathymetry[it]) // land color
+                    }
+                }
+            }
         }
         generateRegularQuadHeightMesh(
             width + 2, height + 2, getIndex(-1, -1),
             stride, cellSizeMeters, mesh.mesh2,
-            { fluidHeight[it] + bathymetry[it] },
-            { x, y, _, dst ->
-                dst.x = getSurfaceHeightAt(x + 1, y) - getSurfaceHeightAt(x - 1, y)
-                dst.y = cellSizeMeters * 2f
-                dst.z = getSurfaceHeightAt(x, y + 1) - getSurfaceHeightAt(x, y - 1)
-                dst.normalize()
+            object : TerrainUtils.HeightMap {
+                override fun get(it: Int) = fluidHeight[it] + bathymetry[it]
+            },
+            object : TerrainUtils.NormalMap {
+                override fun get(x: Int, y: Int, i: Int, dst: Vector3f) {
+                    dst.x = getSurfaceHeightAt(x + 1, y) - getSurfaceHeightAt(x - 1, y)
+                    dst.y = cellSizeMeters * 2f
+                    dst.z = getSurfaceHeightAt(x, y + 1) - getSurfaceHeightAt(x, y - 1)
+                    dst.normalize()
+                }
             },
             getColor
         )
@@ -242,15 +392,25 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     private fun getMaxMomentum(): Float {
         val xs = fluidMomentumX
         val ys = fluidMomentumY
-        val minX = xs.minOrNull()!!
-        val maxX = xs.maxOrNull()!!
-        val minY = ys.minOrNull()!!
-        val maxY = ys.maxOrNull()!!
-        return max(max(-minX, -minY), max(maxX, maxY))
+        var min = Float.POSITIVE_INFINITY
+        var max = Float.NEGATIVE_INFINITY
+        for (f in xs) {
+            if (f.isFinite()) {
+                if (f < min) min = f
+                if (f > max) max = f
+            }
+        }
+        for (f in ys) {
+            if (f.isFinite()) {
+                if (f < min) min = f
+                if (f > max) max = f
+            }
+        }
+        return max(-min, max)
     }
 
-    private fun getWaterColor(i: Int): Int {
-        return getWaterColor(fluidHeight[i])
+    private val getWaterColor = object : TerrainUtils.ColorMap {
+        override fun get(it: Int) = getWaterColor(fluidHeight[it])
     }
 
     private fun getLandColor(height: Float): Int {
@@ -262,6 +422,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     }
 
     private fun getColor11(f: Float, pos: Int = 0xff0000, zero: Int = -1, neg: Int = 0x0055ff): Int {
+        if (!f.isFinite()) return 0xff00ff
         return if (f < 0f) mixARGB(neg, zero, f + 1f) else mixARGB(zero, pos, f)
     }
 
@@ -270,12 +431,16 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         var i = 0
         val t0 = System.nanoTime()
         while (done < dt && i++ < numMaxIterations) {
-            val maxTimeStep = computeMaxTimeStep()
+            val computeTimeStepInterval = computeTimeStepInterval
+            if (computeTimeStepInterval < 2 || maxTimeStep <= 0f || timeStepIndex % computeTimeStepInterval == 0) {
+                maxTimeStep = computeMaxTimeStep()
+            }
             val step = min(dt - done, maxTimeStep)
             if (step > 0f && step.isFinite()) {
                 val scaling = step / cellSizeMeters
                 computeStep(scaling)
                 done += step
+                timeStepIndex++
             } else break
             val t1 = System.nanoTime()
             if (t1 - t0 > 1e9 / 60f) break
@@ -284,7 +449,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     }
 
     private fun copy(src: FloatArray, dst: FloatArray = FloatArray(src.size)): FloatArray {
-        System.arraycopy(src, 0, dst, 0, min(src.size, dst.size))
+        System.arraycopy(src, 0, dst, 0, src.size)
         return dst
     }
 
@@ -294,13 +459,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val height = height
 
         val h0 = fluidHeight
-        val hx = fluidMomentumX
-        val hy = fluidMomentumY
+        val hu0 = fluidMomentumX
 
-        setGhostOutflow(h0, hx, hy)
+        setGhostOutflow(h0)
+        setGhostOutflow(hu0)
 
-        val g0 = copy(h0, tmpH)
-        val gx = copy(hx, tmpHuX)
+        val h1 = copy(h0, tmpH)
+        val hu1 = copy(hu0, tmpHuX)
 
         val b = bathymetry
 
@@ -308,78 +473,74 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val gravity = gravity
 
         // step on x axis
-        processBalanced(0, height, 4) { y0, y1 ->
-            val tmp4f = FloatArray(4)
+        threadPool.processBalanced(-1, height + 1, 4) { y0, y1 ->
+            val tmp4f = tmpV4ByThread.get()
             for (y in y0 until y1) {
                 var index0 = getIndex(-1, y)
                 for (x in -1 until width) {
-                    FWaveSolver.solve(index0, index0 + 1, h0, hx, b, g0, gx, gravity, scaling, tmp4f)
+                    FWaveSolver.solve(index0, index0 + 1, h0, hu0, b, h1, hu1, gravity, scaling, tmp4f)
                     index0++
                 }
             }
         }
 
-        setGhostOutflow(g0, gx, hy)
+        val hv1 = fluidMomentumY
+
+        setGhostOutflow(h1)
+        setGhostOutflow(hv1)
 
         // copy data, only height has changed, so only height needs to be switched
-        copy(g0, h0)
-        val gy = copy(hy, tmpHuY)
+        val h2 = copy(h1, h0)
+        val hv2 = copy(hv1, tmpHuY)
 
         // step on y axis
-        processBalanced(-1, height, 4) { y0, y1 ->
-            val tmp4f = FloatArray(4)
+        threadPool.processBalanced(-1, height, 4) { y0, y1 ->
+            val tmp4f = tmpV4ByThread.get()
             for (y in y0 until y1) {
                 var index0 = getIndex(0, y)
                 for (x in 0 until width) {
-                    FWaveSolver.solve(index0, index0 + stride, g0, hy, b, h0, gy, gravity, scaling, tmp4f)
+                    FWaveSolver.solve(index0, index0 + stride, h1, hv1, b, h2, hv2, gravity, scaling, tmp4f)
                     index0++
                 }
             }
         }
 
         // switch the buffers for the momentum
-        var t = fluidMomentumX
+        var tmp = fluidMomentumX
         fluidMomentumX = tmpHuX
-        tmpHuX = t
+        tmpHuX = tmp
 
-        t = fluidMomentumY
+        tmp = fluidMomentumY
         fluidMomentumY = tmpHuY
-        tmpHuY = t
+        tmpHuY = tmp
 
     }
 
-    fun setGhostOutflow(h: FloatArray = fluidHeight, hx: FloatArray = fluidMomentumX, hy: FloatArray = fluidMomentumY) {
+    fun setGhostOutflow(v: FloatArray) {
+
         // set the ghost zone to be outflow conditions
-        // left boundary
         val width = width
         val height = height
-        for (y in 0 until height) {
+
+        for (y in -1..height) {
             val outside = getIndex(-1, y)
             val inside = getIndex(0, y)
-            h[outside] = h[inside]
-            hx[outside] = hx[inside]
-            hy[outside] = hy[inside]
+            v[outside] = v[inside]
         }
-        for (y in 0 until height) {
+        for (y in -1..height) {
             val outside = getIndex(width, y)
             val inside = getIndex(width - 1, y)
-            h[outside] = h[inside]
-            hx[outside] = hx[inside]
-            hy[outside] = hy[inside]
+            v[outside] = v[inside]
         }
-        for (x in 0 until width) {
+        for (x in -1..width) {
             val outside = getIndex(x, -1)
             val inside = getIndex(x, 0)
-            h[outside] = h[inside]
-            hx[outside] = hx[inside]
-            hy[outside] = hy[inside]
+            v[outside] = v[inside]
         }
-        for (x in 0 until width) {
+        for (x in -1..width) {
             val outside = getIndex(x, height)
             val inside = getIndex(x, height - 1)
-            h[outside] = h[inside]
-            hx[outside] = hx[inside]
-            hy[outside] = hy[inside]
+            v[outside] = v[inside]
         }
     }
 
@@ -392,22 +553,28 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val stride = stride
         val gravity = gravity
         var maxVelocity = 0f
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val index = getIndex(x, y)
-                val h0 = h[index]
-                if (h0 > 0f) {
-                    val h1 = max(
-                        h0, max(
-                            max(h[index - 1], h[index + 1]),
-                            max(h[index - stride], h[index + stride])
+        threadPool.processBalanced(0, height, true) { y0, y1 ->
+            var maxVelocityI = 0f
+            for (y in y0 until y1) {
+                for (x in 0 until width) {
+                    val index = getIndex(x, y)
+                    val h0 = h[index]
+                    if (h0 > 0f) {
+                        val h1 = max(
+                            h0, max(
+                                max(h[index - 1], h[index + 1]),
+                                max(h[index - stride], h[index + stride])
+                            )
                         )
-                    )
-                    val impulse = max(abs(hu[index]), abs(hv[index]))
-                    val velocity = impulse / h0
-                    val expectedVelocity = velocity + sqrt(gravity * h1)
-                    maxVelocity = max(maxVelocity, expectedVelocity)
+                        val impulse = max(abs(hu[index]), abs(hv[index]))
+                        val velocity = impulse / h0
+                        val expectedVelocity = velocity + sqrt(gravity * h1)
+                        if (expectedVelocity > maxVelocityI) maxVelocityI = expectedVelocity
+                    }
                 }
+            }
+            synchronized(threadPool) {
+                maxVelocity = max(maxVelocity, maxVelocityI)
             }
         }
         val is2D = width > 1 || height > 1
@@ -417,6 +584,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     override fun onEditMove(x: Float, y: Float, dx: Float, dy: Float): Boolean {
         if (Input.isLeftDown) {
+            // critical velocity: sqrt(g*h), so make it that we draw that within 10s
             // todo modes: drag fluid down, drag fluid up, todo start wave here to left/right/top/bottom/...
             // todo add fluid, remove fluid
             val hit = Raycast.raycast(
@@ -446,19 +614,26 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 val cellMinY = max((cellY - brushSize).toInt(), 0)
                 val cellMaxY = min((cellY + brushSize).toInt(), height - 1)
                 // compute brush strength
-                val brushStrength = (if (Input.isShiftDown) -1f else +1f) * 50f * GFX.deltaTime
+                val brushStrength = (if (Input.isShiftDown) -1f else +1f) * 100f * GFX.deltaTime
                 // apply brush with circular falloff
                 val invBrushSize = 1f / brushSize
+                val fluidHeight = fluidHeight
+                val fluidMomentumX = fluidMomentumX
+                val fluidMomentumY = fluidMomentumY
+                val gravity = gravity
                 for (yi in cellMinY..cellMaxY) {
                     for (xi in cellMinX..cellMaxX) {
                         val index = getIndex(xi, yi)
                         val dxi = (xi - cellX) * invBrushSize
                         val dyi = (yi - cellY) * invBrushSize
-                        val strength = brushStrength * getNormalizedBrushShape(dxi, dyi) * fluidHeight[index]
+                        val strength =
+                            brushStrength * getNormalizedBrushShape(dxi, dyi) * sqrt(fluidHeight[index] * gravity)
                         fluidMomentumX[index] += dxi * strength
                         fluidMomentumY[index] += dyi * strength
                     }
                 }
+                // something has changed, to update the mesh
+                invalidateMesh()
             }
             return true
         }
@@ -481,6 +656,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         clone.cellSizeMeters = cellSizeMeters
         clone.gravity = gravity
         clone.cfl2d = cfl2d
+        clone.timeFactor = timeFactor
         // copy the array properties
         clone.fluidHeight = copy(fluidHeight)
         clone.fluidMomentumX = copy(fluidMomentumX)
@@ -492,13 +668,25 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         clone.tmpHuY = FloatArray(size)
         clone.needsUpdate = needsUpdate
         clone.wantsReset = wantsReset
-        // copy the reference
+        clone.colorMap = colorMap
+        clone.computeTimeStepInterval = computeTimeStepInterval
+        // copy the references
+        clone.setup = getInClone(setup, clone)
         clone.bathymetryMesh = getInClone(bathymetryMesh, clone)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mesh2.destroy()
     }
 
     override val className: String = "Tsunamis/FluidSim"
 
     companion object {
+        val threadPool = ProcessingGroup("TsunamiSim", 1f)
+        val tmpV4ByThread = ThreadLocal2 { FloatArray(4) }
+        private val defaultColorMap = getReference("res://colormaps/globe.xml")
+        private val LOGGER = LogManager.getLogger(FluidSim::class)
         private val f0 = FloatArray(0)
     }
 
