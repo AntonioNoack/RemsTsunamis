@@ -1,74 +1,103 @@
-
 # Project Plan
 
-## Integration into Rem's Engine (until 10.01.2022)
+## Integration into Rem's Engine
+*until 10.01.2022, CPU compute*
 
-- create extension
-- add tsunami component
-- port setups from C++ to engine
-- make them work with the editor
-- mesh generation
+- [x] create extension
+- [x] add tsunami component as a ProceduralMesh
+- [x] port setups from C++ to engine as components
+- [x] make them work with the editor
+- [x] mesh generation
 
-- color map import
-- use custom vertex shader, and texture for height?
+- [x] color map import
 
-- draw force/impulse in a certain area
-- restart button
+To save bandwidth, we could use a static, or even on-gpu-procedurally generated grid, where the height is read from a texture.
+- [ ] use custom vertex shader, and texture for height? (engine would need to be adjusted, as this isn't currently
+  supported)
 
-- it would be interesting to have different resolutions depending on the distance to the camera
-(levels of detail)
+- [ ] draw force/impulse in a certain area
+- [x] restart button
 
-### NetCDF (until 10.01.2022 as import is already working)
+- [ ] it would be interesting to have different resolutions depending on the distance to the camera
+  (levels of detail)
 
-- NetCDF import
-- NetCDF export
+### NetCDF Support
+*until 10.01.2022*
 
-- define NetCDF as image type for preview purposes
-(this already works)
+- [x] NetCDF import
+- [ ] NetCDF export, if we want to use ParaView/Visit for visualization
+
+- [x] define NetCDF as image type for preview purposes
 
 ## GLSL vs Compute
+### Basics
+*17.01.2022*
 
-### Basics (until 17.01.2022)
+- [ ] write graphics shaders
+- [x] write compute shaders
 
-- write graphics & compute shaders
-- they probably will share the core components
-- outflow boundary condition can be done using clamping (computed in graphics shaders anyways)
+They probably will share the core components
 
-- measure performance & bandwidth
-- compare with theoretical hardware capabilities
+- [x] outflow boundary condition can be done using clamping (computed in graphics shaders anyways)
 
-### Performance Improvements (until 24.01.2022)
+- [ ] measure baseline performance & bandwidth
+- [ ] compare with theoretical hardware capabilities
 
-Each cell has influence on its two neighbors
-Possibilities:
-a) two passes, one for left neighbor, one for right one
-	2x computation needed
-	doubled number of passes
-b) just compute both in a single pass
-	2x computation needed
-c) shared memory within a compute group: within this groups, the results can be shared
-	only ~1.05x computations needed
-d) compute with integers instead of floats; probably would be complicated, error prone,
-	and maybe would bring nothing
-	
-- disable mipmaps, currently they are always created after a texture has changed
-(mipmaps are used for rendering with less aliasing)
+### Performance Improvements
+*until 24.01.2022*
 
-### Performance Measurements & Towards HPC, test this until 24.01.2022
+#### Theoretical
 
-- get java running / test it on ARA cluster or GPU node
-- get engine running on ARA cluster or GPU node -> will LWJGL work?
+I've found that the atomic operations in OpenGL (compute) are too limited for our purposes.
+They only support integers, not floating point values.
+I don't know whether barriers will solve the problem of writing to a cell, reading its value, and then writing again.
 
-If not,
-a) test on another computer
-b) use LWJGL via different paths
-c) use Vulkan (will be complicated, and surely take a week)
-d) use CUDA + C/C++ instead
+#### Solutions, if it doesn't work
 
-### Measurements until 31.01.2022
+Each cell has influence on its two neighbors Possibilities:
+- [ ] two passes, one for left neighbor, one for right one 2x computation needed doubled number of passes
+- [x] just compute both in a single pass 2x computation needed 
+- [ ] shared memory within a compute group: within this groups, the results can be shared only ~1.05x computations needed
+- [ ] compute with integers instead of floats; probably would be complicated, error prone, and maybe would bring nothing
 
-- measure performance
-- measure bandwidth
+#### Other optimizations
 
-If OpenGL + Java + LWJGL works,
-- use pixel buffer objects for optimized, async data transfer?
+- [ ] Disable mipmaps, currently they are always created after a texture has changed (mipmaps are used for rendering with less aliasing)
+- [ ] It could be tested whether writing formulas as floats or with vectors (vec2) makes a difference.
+- [ ] If there is enough time, Pixel Buffer Objects could be used for optimized, asynchronous data transfer.
+
+### Performance Measurements & Towards HPC
+*test this until 24.01.2022*
+
+- [x] get java running / test it on ARA cluster or GPU node
+- [ ] get engine running on ARA cluster or GPU node -> will LWJGL work?
+
+If not, 
+- test on another computer 
+- use LWJGL via different paths 
+- use Vulkan (will be complicated, and surely take a week)
+- use CUDA + C/C++ instead
+
+#### Updates:
+
+I've done some first tests:
+- Java runs fine
+- LWJGL can call functions, but I need OpenGL
+
+OpenGL needs, as far as I know, a window context of some sort. 
+GLFW is the window library, that I usually use in Rem's Engine.
+EGL is another one, which is kind-of said to work without X11.
+
+- GLFW does not run, as it fails to create a window without X11
+- EGL may have a work-around, but it hasn't worked for me yet on ARA/gpu_test
+
+It works on gpu01.inf-ra.uni-jena.de (RTX 2070 Super), gpu02 (GTX 780), gpu03 (GTX 780).
+It fails on ARA/gpu_test and login.fmi.uni-jena.de.
+
+### Measurements
+*until 30.01.2022 (day before final presentation)*
+
+- [ ] measure performance
+- [ ] measure bandwidth
+- [ ] compare them to the CPU implementation in C++
+- [ ] integrate the "best" solution into the FluidSim component for real time visualization?
