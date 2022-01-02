@@ -10,7 +10,7 @@
       <element id="extracted-dir" path="$KOTLIN_BUNDLED$/lib/kotlin-reflect.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$KOTLIN_BUNDLED$/lib/kotlin-test.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$USER_HOME$/Downloads/lib/java/lwjgl323egl/lwjgl-egl.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$PROJECT_DIR$/../VideoStudio/out/artifacts/Compute/VideoStudio.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../VideoStudio/out/artifacts/Windows/VideoStudio.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>

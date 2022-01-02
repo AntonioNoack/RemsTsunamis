@@ -1,11 +1,9 @@
 package me.anno.tsunamis.gpu.compute
 
 import me.anno.Engine
-import me.anno.gpu.GFX
 import me.anno.gpu.OpenGL.useFrame
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
-import me.anno.gpu.hidden.HiddenOpenGLContext
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeShader.Companion.bindTexture
 import me.anno.gpu.shader.ComputeTextureMode
@@ -19,17 +17,14 @@ import me.anno.tsunamis.aracluster.HeadlessContext
 import me.anno.tsunamis.setups.CircularDiscontinuity
 import me.anno.tsunamis.setups.LinearDiscontinuity
 import me.anno.tsunamis.setups.NetCDFSetup
-import me.anno.utils.OS.desktop
-import me.anno.video.VideoCreator.Companion.renderVideo
 import org.apache.logging.log4j.LogManager
 import org.joml.Vector2i
-import org.lwjgl.opengl.GL
 
-object TsunamiShaders {
+object Compute {
 
     // loggers are used to identify where log messages are coming from,
     // and to filter, if needed
-    private val LOGGER = LogManager.getLogger(TsunamiShaders::class)
+    private val LOGGER = LogManager.getLogger(Compute::class)
 
     // texture memory layout: height, momentum x, momentum y, bathymetry
 
@@ -194,6 +189,8 @@ object TsunamiShaders {
     @JvmStatic
     fun main(args: Array<String>) {
 
+        // todo apache cli
+
         // 10800 x 6000
         // test the computation
         val w = 1024
@@ -204,7 +201,7 @@ object TsunamiShaders {
         val w2 = 1024
         val h2 = w2 * h / w
 
-        HeadlessContext.createContext(w, h, true)
+        HeadlessContext.createContext(w, h, false)
         // HiddenOpenGLContext.createOpenGL(w, h)
         ShaderLib.init()
 

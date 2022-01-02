@@ -10,6 +10,7 @@
 - [x] mesh generation
 
 - [x] color map import
+- [x] different visualizations (surface height, momentum in x/y direction, wave height)
 
 To save bandwidth, we could use a static, or even on-gpu-procedurally generated grid, where the height is read from a texture.
 - [ ] use custom vertex shader, and texture for height? (engine would need to be adjusted, as this isn't currently
@@ -66,11 +67,16 @@ Each cell has influence on its two neighbors Possibilities:
 - [ ] It could be tested whether writing formulas as floats or with vectors (vec2) makes a difference.
 - [ ] If there is enough time, Pixel Buffer Objects could be used for optimized, asynchronous data transfer.
 
+Another task:
+
+- [ ] compare the ease of implementation between graphics and compute pipeline
+
 ### Performance Measurements & Towards HPC
 *test this until 24.01.2022*
 
 - [x] get java running / test it on ARA cluster or GPU node
 - [ ] get engine running on ARA cluster or GPU node -> will LWJGL work?
+- [ ] define the benchmark options using Apache CLI
 
 If not, 
 - test on another computer 
@@ -100,4 +106,4 @@ It fails on ARA/gpu_test and login.fmi.uni-jena.de.
 - [ ] measure performance
 - [ ] measure bandwidth
 - [ ] compare them to the CPU implementation in C++
-- [ ] integrate the "best" solution into the FluidSim component for real time visualization?
+- [ ] integrate the "best" solution into the FluidSim component for real time visualization? (if it's not CUDA)

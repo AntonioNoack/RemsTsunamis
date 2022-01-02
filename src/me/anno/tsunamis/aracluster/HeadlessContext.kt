@@ -67,7 +67,7 @@ object HeadlessContext {
             eglQueryDevicesEXT(devices, numDevices)
             check()
             if (numDevices[0] == 0) throw RuntimeException("No EGL devices found")
-            LOGGER.info("Detected ${numDevices[0]} devices")
+            LOGGER.info("Detected ${numDevices[0]} devices: ${(0 until numDevices[0]).map { devices[it] }}")
             display = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, devices[0], null as IntArray?)
             check()
         }
