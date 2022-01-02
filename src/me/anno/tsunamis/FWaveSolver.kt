@@ -268,15 +268,14 @@ object FWaveSolver {
         val lines = getReference("E:/Documents/Uni/Master/WS2122/tsunami/data/middle_states.csv")
             .inputStream().bufferedReader()
 
-        var passedCtr = 0
-
-        var index = -1
-        while (index < 500e3) {
+        var numPassed = 0
+        var numTests = 0
+        while (numTests < 500e3) {
 
             val line = lines.readLine() ?: break
             if (line.isEmpty() || line[0] == 'h' || line[0] == '#') continue
 
-            index++
+            numTests++
 
             val parts = line.split(',').map { it.toFloat() }
             hl = parts[0]
@@ -296,7 +295,7 @@ object FWaveSolver {
                     sim.step(1e9f, 1)
                 } catch (e: Exception) {
                     // e.printStackTrace()
-                    LOGGER.warn("failed line[$index] $line with $e")
+                    LOGGER.warn("failed line[$numTests] $line with $e")
                     break
                 }
 
@@ -305,14 +304,14 @@ object FWaveSolver {
                 val passed = abs(hStar - hComputed) < targetPrecision
                 if (passed) {
                     // println("passed $index $line :)")
-                    passedCtr++
+                    numPassed++
                     break
                 }
-                if (i == maxSteps - 1) LOGGER.warn("did not pass, got $hComputed instead of $hStar from $line, line $index")
+                if (i == maxSteps - 1) LOGGER.warn("did not pass, got $hComputed instead of $hStar from $line, line $numTests")
             }
         }
 
-        LOGGER.info("$passedCtr/$index passed")
+        LOGGER.info("$numPassed/$numTests passed")
 
     }
 

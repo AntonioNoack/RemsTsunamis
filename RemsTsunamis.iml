@@ -11,5 +11,6 @@
     <orderEntry type="library" name="KotlinJavaRuntime" level="project" />
     <orderEntry type="library" name="VideoStudio" level="project" />
     <orderEntry type="library" name="netcdfAll-5.4.2" level="project" />
+    <orderEntry type="library" name="lwjgl-egl-javadoc" level="project" />
   </component>
 </module>

@@ -27,10 +27,12 @@ class NetCDFSetup : FluidSimSetup() {
     var applyAveraging = true
 
     @DebugProperty
+    @Suppress("UNUSED")
     val dataWidth
         get() = getData(bathymetryFile, true)?.width ?: -1
 
     @DebugProperty
+    @Suppress("UNUSED")
     val dataHeight
         get() = getData(bathymetryFile, true)?.height ?: -1
 

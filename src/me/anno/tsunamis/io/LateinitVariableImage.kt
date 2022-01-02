@@ -35,10 +35,6 @@ class LateinitVariableImage(val variableName: String, val file: FileReference) :
         return image.createIntImage()
     }
 
-    override fun createRGBFrom3StridedData(texture: Texture2D?, checkRedundancy: Boolean, data: ByteArray?) {
-        image.createRGBFrom3StridedData(texture, checkRedundancy, data)
-    }
-
     override fun createTexture(texture: Texture2D?, checkRedundancy: Boolean) {
         image.createTexture(texture, checkRedundancy)
     }

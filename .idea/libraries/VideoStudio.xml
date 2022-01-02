@@ -1,7 +1,7 @@
 <component name="libraryTable">
   <library name="VideoStudio">
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/../VideoStudio/out/artifacts/Windows/VideoStudio.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../VideoStudio/out/artifacts/Universal/VideoStudio.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>

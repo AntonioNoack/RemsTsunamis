@@ -11,14 +11,12 @@ import me.anno.io.files.Signature
 import me.anno.io.zip.ZipCache
 import me.anno.tsunamis.io.NetCDFCache
 import me.anno.tsunamis.io.NetCDFImageCache
-import me.anno.tsunamis.setups.CircularDiscontinuity
-import me.anno.tsunamis.setups.CriticalFlowSetup
-import me.anno.tsunamis.setups.LinearDiscontinuity
-import me.anno.tsunamis.setups.NetCDFSetup
+import me.anno.tsunamis.setups.*
 import java.io.InputStream
 
 class TsunamiSim : Mod() {
 
+    // the bytes, that identify a NetCDF file; such file signatures can be registered to identify file types within Rem's Engine
     private val netCDFSignature = Signature("netcdf", 0, listOf(0x89, 'H'.code, 'D'.code, 'F'.code))
 
     private fun readNetCDF(file: FileReference): Image? {
@@ -38,6 +36,7 @@ class TsunamiSim : Mod() {
     override fun onPreInit() {
         super.onPreInit()
 
+        // register the NetCDF file signature, and image readers for it
         Signature.register(netCDFSignature)
         ImageCPUCache.registerReader("netcdf", ::readNetCDF, ::readNetCDF, ::readNetCDF)
         ImageCPUCache.registerReader("nc", ::readNetCDF, ::readNetCDF, ::readNetCDF)
@@ -49,6 +48,7 @@ class TsunamiSim : Mod() {
         registerCustomClass(CircularDiscontinuity())
         registerCustomClass(NetCDFSetup())
         registerCustomClass(CriticalFlowSetup())
+        registerCustomClass(PoolSetup())
 
     }
 

@@ -43,17 +43,100 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     // todo option to create border mesh for nicer looks
 
+    @Group("Visuals")
     @Type("ManualProceduralMesh/PrefabSaveable")
+    @SerializedProperty
     var bathymetryMesh: ManualProceduralMesh? = null
 
+    @Group("Visuals")
     @SerializedProperty
     var colorMap: FileReference = defaultColorMap
+
+    @Group("Visuals")
+    @SerializedProperty
+    var visualization = Visualisation.HEIGHT_MAP
+
+    @Group("Size")
+    @Order(0)
+    @SerializedProperty
+    var width = 10
+
+    @Group("Size")
+    @Order(1)
+    @SerializedProperty
+    var height = 10
+
+    @Docs("How large each cell is in meters; only square cells are supported")
+    @Group("Size")
+    @Range(0.0, Double.POSITIVE_INFINITY)
+    @SerializedProperty
+    var cellSizeMeters = 1f
+        set(value) {
+            if (field != value && value > 0f) {
+                field = value
+                invalidateMesh()
+                invalidateBathymetryMesh()
+            }
+        }
+
+    @DebugProperty
+    @NotSerializedProperty
+    var maxTimeStep = 0f
+
+    @DebugProperty
+    @NotSerializedProperty
+    var maxVisualizedValue = 0f
+
+    @NotSerializedProperty
+    var fluidHeight: FloatArray = f0
+
+    @NotSerializedProperty
+    private var tmpH = f0
+
+    @NotSerializedProperty
+    var fluidMomentumX: FloatArray = f0
+
+    @NotSerializedProperty
+    private var tmpHuX = f0
+
+    @NotSerializedProperty
+    var fluidMomentumY: FloatArray = f0
+
+    @NotSerializedProperty
+    private var tmpHuY = f0
+
+    @NotSerializedProperty
+    var bathymetry: FloatArray = f0
+
+    @Group("Time")
+    @Docs("Gravity in m/s²")
+    @SerializedProperty
+    var gravity = 9.81f
+
+    @Group("Time")
+    @SerializedProperty
+    var timeFactor = 1f
+
+    @Group("Time")
+    @SerializedProperty
+    @Range(0.0, 0.5)
+    var cfl2d = 0.45f
+
+    @Group("Time")
+    @Docs("Every n-th time step, the maximum dt is computed")
+    @SerializedProperty
+    var computeTimeStepInterval = 0
+
+    @NotSerializedProperty
+    var timeStepIndex = 0
+
+    private val stride get() = width + 2
 
     @NotSerializedProperty
     var wantsReset = false
 
     @DebugAction
-    fun reset() {
+    fun restartSimulation() {
         wantsReset = true
         hasValidBathymetryMesh = false
     }
@@ -65,87 +148,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     @NotSerializedProperty
     var hasValidBathymetryMesh = false
-
-    @DebugProperty
-    var maxTimeStep = 0f
-
-    @DebugProperty
-    var maxVisualizedValue = 0f
-
-    // 0 = height map, 1 = momentum x, 2 = momentum y, 3 = water surface
-    @Range(0.0, 3.0)
-    @SerializedProperty
-    var visualization = 0
-
-    @SerializedProperty
-    var width = 10
-
-    @SerializedProperty
-    var height = 10
-
-    @NotSerializedProperty
-    var fluidHeight: FloatArray = f0
-
-    @NotSerializedProperty
-    var fluidMomentumX: FloatArray = f0
-
-    @NotSerializedProperty
-    var fluidMomentumY: FloatArray = f0
-
-    @NotSerializedProperty
-    var bathymetry: FloatArray = f0
-
-    @SerializedProperty
-    var gravity = 9.81f
-
-    @SerializedProperty
-    var timeFactor = 1f
-
-    @SerializedProperty
-    var cellSizeMeters = 1f
-        set(value) {
-            if (field != value && value > 0f) {
-                field = value
-                invalidateMesh()
-            }
-        }
-
-    @SerializedProperty
-    @Range(0.0, 0.5)
-    var cfl2d = 0.45f
-
-    @SerializedProperty
-    var computeTimeStepInterval = 0
-
-    @NotSerializedProperty
-    var timeStepIndex = 0
-
-    val stride get() = width + 2
-
-    @NotSerializedProperty
-    private var tmpH = f0
-
-    @NotSerializedProperty
-    private var tmpHuX = f0
-
-    @NotSerializedProperty
-    private var tmpHuY = f0
-
-    /*@DebugProperty
-    val bathInfo: String
-        get() = "${bathymetry.minOrNull()} - ${bathymetry.maxOrNull()}, avg: ${bathymetry.average()}\n"
-
-    @DebugProperty
-    val heightInfo: String
-        get() = "${fluidHeight.minOrNull()} - ${fluidHeight.maxOrNull()}, avg: ${fluidHeight.average()}\n"
-
-    @DebugProperty
-    val impulseXInfo: String
-        get() = "${fluidMomentumX.minOrNull()} - ${fluidMomentumX.maxOrNull()}, avg: ${fluidMomentumX.average()}\n"
-
-    @DebugProperty
-    val impulseYInfo: String
-        get() = "${fluidMomentumY.minOrNull()} - ${fluidMomentumY.maxOrNull()}, avg: ${fluidMomentumY.average()}"*/
 
     fun getIndex(x: Int, y: Int): Int {
         val width = width
@@ -228,6 +230,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     }
 
     fun initWithSetup(setup: FluidSimSetup) {
+        this.setup = setup
         if (ensureFieldSize()) {
             val w = width
             val h = height
@@ -305,7 +308,19 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val fluidMomentumX = fluidMomentumX
         val fluidMomentumY = fluidMomentumY
         val getColor: TerrainUtils.ColorMap = when (visualization) {
-            1 -> {
+            Visualisation.HEIGHT_MAP -> {
+                maxVisualizedValue = 0f
+                if (colorMap == null) getWaterColor
+                else object : TerrainUtils.ColorMap {
+                    override fun get(it: Int): Int {
+                        val h = fluidHeight[it]
+                        return if (h > 0f) {// under water, surface color
+                            colorMap.getColor(-h)
+                        } else colorMap.getColor(bathymetry[it]) // land color
+                    }
+                }
+            }
+            Visualisation.MOMENTUM_X -> {
                 val maxMomentum = getMaxMomentum()
                 maxVisualizedValue = maxMomentum
                 val momentumScale = 1f / max(maxMomentum, 1e-38f)
@@ -320,7 +335,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                     }
                 }
             }
-            2 -> {
+            Visualisation.MOMENTUM_Y -> {
                 val maxMomentum = getMaxMomentum()
                 maxVisualizedValue = maxMomentum
                 val momentumScale = 1f / max(maxMomentum, 1e-38f)
@@ -335,7 +350,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                     }
                 }
             }
-            3 -> {
+            Visualisation.WATER_SURFACE -> {
                 var maxHeight = 0f
                 for (it in fluidHeight.indices) {
                     val h = fluidHeight[it]
@@ -355,18 +370,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                         return if (h > 0f) {// under water, surface color
                             getColor11((h + b) * heightScale)
                         } else colorMap.getColor(b) // land color
-                    }
-                }
-            }
-            else -> {
-                maxVisualizedValue = 0f
-                if (colorMap == null) getWaterColor
-                else object : TerrainUtils.ColorMap {
-                    override fun get(it: Int): Int {
-                        val h = fluidHeight[it]
-                        return if (h > 0f) {// under water, surface color
-                            colorMap.getColor(-h)
-                        } else colorMap.getColor(bathymetry[it]) // land color
                     }
                 }
             }
@@ -550,25 +553,21 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val h = fluidHeight
         val hu = fluidMomentumX
         val hv = fluidMomentumY
-        val stride = stride
         val gravity = gravity
         var maxVelocity = 0f
+        // check for out of bounds conditions
+        h[getIndex(-1, -1)]
+        h[getIndex(width, height)]
         threadPool.processBalanced(0, height, true) { y0, y1 ->
             var maxVelocityI = 0f
             for (y in y0 until y1) {
                 for (x in 0 until width) {
                     val index = getIndex(x, y)
-                    val h0 = h[index]
-                    if (h0 > 0f) {
-                        val h1 = max(
-                            h0, max(
-                                max(h[index - 1], h[index + 1]),
-                                max(h[index - stride], h[index + stride])
-                            )
-                        )
+                    val hi = h[index]
+                    if (hi > 0f) {
                         val impulse = max(abs(hu[index]), abs(hv[index]))
-                        val velocity = impulse / h0
-                        val expectedVelocity = velocity + sqrt(gravity * h1)
+                        val velocity = impulse / hi
+                        val expectedVelocity = velocity + sqrt(gravity * hi)
                         if (expectedVelocity > maxVelocityI) maxVelocityI = expectedVelocity
                     }
                 }
