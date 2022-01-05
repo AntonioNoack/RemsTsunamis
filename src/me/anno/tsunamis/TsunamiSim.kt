@@ -9,6 +9,7 @@ import me.anno.io.ISaveable.Companion.registerCustomClass
 import me.anno.io.files.FileReference
 import me.anno.io.files.Signature
 import me.anno.io.zip.ZipCache
+import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFCache
 import me.anno.tsunamis.io.NetCDFImageCache
 import me.anno.tsunamis.setups.*
@@ -17,7 +18,14 @@ import java.io.InputStream
 class TsunamiSim : Mod() {
 
     // the bytes, that identify a NetCDF file; such file signatures can be registered to identify file types within Rem's Engine
-    private val netCDFSignature = Signature("netcdf", 0, listOf(0x89, 'H'.code, 'D'.code, 'F'.code))
+    private val netCDFSignatures = listOf(
+        Signature("netcdf", 0, listOf(0x89, 'H'.code, 'D'.code, 'F'.code)),
+        Signature("netcdf", 0, listOf('C'.code, 'D'.code, 'F'.code))
+    )
+
+    private val colorMapSignatures = listOf(
+        Signature("colormap", 0, "<ColorMap")
+    )
 
     private fun readNetCDF(file: FileReference): Image? {
         return NetCDFImageCache.getData(file, false)
@@ -33,14 +41,32 @@ class TsunamiSim : Mod() {
         return readNetCDF(bytes)
     }
 
+    private fun readColorMap(bytes: ByteArray): Image? {
+        return bytes.inputStream().use { ColorMap.read(it) }
+    }
+
+    private fun readColorMap(file: FileReference): Image? {
+        return file.inputStream().use { ColorMap.read(it) }
+    }
+
+    private fun readColorMap(inputStream: InputStream): Image? {
+        return inputStream.use { ColorMap.read(it) }
+    }
+
     override fun onPreInit() {
         super.onPreInit()
 
         // register the NetCDF file signature, and image readers for it
-        Signature.register(netCDFSignature)
+        for (s in netCDFSignatures)
+            Signature.register(s)
         ImageCPUCache.registerReader("netcdf", ::readNetCDF, ::readNetCDF, ::readNetCDF)
         ImageCPUCache.registerReader("nc", ::readNetCDF, ::readNetCDF, ::readNetCDF)
         ZipCache.register("netcdf", NetCDFCache::readAsFolder)
+
+        // register color map preview
+        for (s in colorMapSignatures)
+            Signature.register(s)
+        ImageCPUCache.registerReader("colormap", ::readColorMap, ::readColorMap, ::readColorMap)
 
         // register components
         registerCustomClass(FluidSim())
@@ -54,9 +80,8 @@ class TsunamiSim : Mod() {
 
     override fun onExit() {
         super.onExit()
-
-        Signature.unregister(netCDFSignature)
-
+        for (signature in netCDFSignatures)
+            Signature.unregister(signature)
     }
 
     companion object {

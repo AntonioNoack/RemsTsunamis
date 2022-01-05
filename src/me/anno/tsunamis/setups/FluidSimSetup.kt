@@ -63,6 +63,29 @@ open class FluidSimSetup : Component() {
         }
     }
 
+    fun applyBorder(
+        w: Int,
+        h: Int,
+        height: FloatArray,
+    ) {
+        val stride = w + 2
+        val bh = borderHeight
+        val fh = max(0f, -bh)
+        val yStride = h * stride
+        for (x in 1 until w) {
+            val i = x + stride
+            val j = x + yStride
+            height[i] = fh
+            height[j] = fh
+        }
+        for (y in 1 .. h) {
+            val i = y * stride + 1
+            val j = i + stride - 3
+            height[i] = fh
+            height[j] = fh
+        }
+    }
+
     open fun fillHeight(w: Int, h: Int, dst: FloatArray) {
         var i = 0
         for (y in -1..h) {

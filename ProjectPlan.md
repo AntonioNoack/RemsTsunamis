@@ -16,6 +16,8 @@ To save bandwidth, we could use a static, or even on-gpu-procedurally generated 
 - [ ] use custom vertex shader, and texture for height? (engine would need to be adjusted, as this isn't currently
   supported)
 
+Others:
+
 - [ ] draw force/impulse in a certain area
 - [x] restart button
 
@@ -26,7 +28,7 @@ To save bandwidth, we could use a static, or even on-gpu-procedurally generated 
 *until 10.01.2022*
 
 - [x] NetCDF import
-- [ ] NetCDF export, if we want to use ParaView/Visit for visualization
+- [x] NetCDF export, if we want to use ParaView/Visit for visualization
 
 - [x] define NetCDF as image type for preview purposes
 
@@ -75,7 +77,7 @@ Another task:
 *test this until 24.01.2022*
 
 - [x] get java running / test it on ARA cluster or GPU node
-- [ ] get engine running on ARA cluster or GPU node -> will LWJGL work?
+- [x] get engine running on ARA cluster or GPU node -> will LWJGL work?
 - [ ] define the benchmark options using Apache CLI
 
 If not, 
@@ -99,6 +101,11 @@ EGL is another one, which is kind-of said to work without X11.
 
 It works on gpu01.inf-ra.uni-jena.de (RTX 2070 Super), gpu02 (GTX 780), gpu03 (GTX 780).
 It fails on ARA/gpu_test and login.fmi.uni-jena.de.
+
+#### Solution:
+
+Creating a job with salloc, and logging in with the option "-X" solved the issue. A driver was found,
+and the "Tesla P100-PCIE-16GB/PCIe/SSE2" GPU was correctly detected.
 
 ### Measurements
 *until 30.01.2022 (day before final presentation)*

@@ -13,14 +13,16 @@ object NetCDFCache : CacheSection("NetCDF") {
 
     fun loadFile(file: FileReference, async: Boolean): NetcdfFile? {
         val data = getFileEntry(file, false, 10_000, async) { file1, _ ->
-            val netcdfFile = if (file1 is FileFileRef) {
-                NetcdfFiles.open(file1.absolutePath)
-            } else {
-                NetcdfFiles.openInMemory(file1.name, file1.readBytes())
-            }
-            object : CacheData<NetcdfFile>(netcdfFile) {
-                override fun destroy() {
-                    value.close()
+            synchronized(NetCDFMutex) {
+                val netcdfFile = if (file1 is FileFileRef) {
+                    NetcdfFiles.open(file1.absolutePath)
+                } else {
+                    NetcdfFiles.openInMemory(file1.name, file1.readBytes())
+                }
+                object : CacheData<NetcdfFile>(netcdfFile) {
+                    override fun destroy() {
+                        value.close()
+                    }
                 }
             }
         } as? CacheData<*>

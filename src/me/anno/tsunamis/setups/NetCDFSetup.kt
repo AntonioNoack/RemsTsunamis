@@ -4,7 +4,7 @@ import me.anno.ecs.annotations.DebugProperty
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.io.files.FileReference
-import me.anno.io.files.InvalidRef
+import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.serialization.SerializedProperty
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.io.NetCDFImageCache.getData
@@ -14,10 +14,12 @@ import me.anno.utils.hpc.HeavyProcessing.processBalanced
 class NetCDFSetup : FluidSimSetup() {
 
     @SerializedProperty
-    var bathymetryFile: FileReference = InvalidRef
+    var bathymetryFile: FileReference =
+        getReference("E:\\Documents\\Uni\\Master\\WS2122/tohoku_gebco08_ucsb3_250m_bath.nc")
 
     @SerializedProperty
-    var displacementFile: FileReference = InvalidRef
+    var displacementFile: FileReference =
+        getReference("E:\\Documents\\Uni\\Master\\WS2122/tohoku_gebco08_ucsb3_250m_displ.nc")
 
     @Range(0.0, Double.POSITIVE_INFINITY)
     @SerializedProperty
@@ -56,8 +58,26 @@ class NetCDFSetup : FluidSimSetup() {
         dst.fill(0f)
     }
 
+    override fun getHeight(x: Int, y: Int, w: Int, h: Int): Float {
+        return -getBathymetry(x, y, w, h)
+    }
+
+    override fun getBathymetry(x: Int, y: Int, w: Int, h: Int): Float {
+        val data = getData(bathymetryFile, false)!!
+        val fx = x.toFloat() * data.width.toFloat() / w.toFloat()
+        val fy = y.toFloat() * data.height.toFloat() / h.toFloat()
+        return data.getValue(fx, fy)
+    }
+
+    override fun getDisplacement(x: Int, y: Int, w: Int, h: Int): Float {
+        val data = getData(displacementFile, false)!!
+        val fx = x.toFloat() * data.width.toFloat() / w.toFloat()
+        val fy = y.toFloat() * data.height.toFloat() / h.toFloat()
+        return data.getValue(fx, fy)
+    }
+
     override fun fillHeight(w: Int, h: Int, dst: FloatArray) {
-        val data = getData(bathymetryFile, true)!!
+        val data = getData(bathymetryFile, false)!!
         fillData(w, h, dst, data)
         val h0 = -shoreCliffHeight
         for (i in dst.indices) {
@@ -71,8 +91,8 @@ class NetCDFSetup : FluidSimSetup() {
     }
 
     override fun fillBathymetry(w: Int, h: Int, dst: FloatArray) {
-        val bathymetryValues = getData(bathymetryFile, true)!!
-        val displacement = getData(displacementFile, true)!!
+        val bathymetryValues = getData(bathymetryFile, false)!!
+        val displacement = getData(displacementFile, false)!!
         fillData(w, h, dst, bathymetryValues)
         val h1 = shoreCliffHeight
         if (h1 > 0f) {

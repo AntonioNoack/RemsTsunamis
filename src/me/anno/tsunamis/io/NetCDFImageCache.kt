@@ -10,10 +10,12 @@ import ucar.nc2.NetcdfFiles
 object NetCDFImageCache : CacheSection("NetCDF-Images") {
 
     fun getData(bytes: ByteArray, variableName: String?): VariableImage? {
-        val data = NetcdfFiles.openInMemory("?", bytes)
-        val image = getData(data, variableName)
-        data.close()
-        return image
+        synchronized(NetCDFMutex) {
+            val data = NetcdfFiles.openInMemory("?", bytes)
+            val image = getData(data, variableName)
+            data.close()
+            return image
+        }
     }
 
     fun getData(file: FileReference, async: Boolean): VariableImage? {

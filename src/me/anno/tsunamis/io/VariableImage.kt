@@ -22,14 +22,16 @@ class VariableImage(variable: Variable) : Image(
     private val max: Float
 
     init {
-        val shape = variable.shape
-        val dataArray = if (shape.size <= 2) variable.read()
-        else variable.read(
-            IntArray(shape.size), // offset
-            IntArray(shape.size) { // slice size
-                if (it < shape.size - 2) 1 else shape[it]
-            })
-        val floats = dataArray.get1DJavaArray(DataType.FLOAT) as FloatArray
+        val floats = synchronized(NetCDFMutex) {
+            val shape = variable.shape
+            val dataArray = if (shape.size <= 2) variable.read()
+            else variable.read(
+                IntArray(shape.size), // offset
+                IntArray(shape.size) { // slice size
+                    if (it < shape.size - 2) 1 else shape[it]
+                })
+            dataArray.get1DJavaArray(DataType.FLOAT) as FloatArray
+        }
         var min = Float.POSITIVE_INFINITY
         var max = Float.NEGATIVE_INFINITY
         clearNaNs(width, height, floats)
