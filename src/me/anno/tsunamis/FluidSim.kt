@@ -6,6 +6,7 @@ import me.anno.ecs.components.mesh.ProceduralMesh
 import me.anno.ecs.components.mesh.terrain.TerrainUtils
 import me.anno.ecs.components.mesh.terrain.TerrainUtils.generateRegularQuadHeightMesh
 import me.anno.ecs.interfaces.CustomEditMode
+import me.anno.ecs.prefab.Prefab
 import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.engine.raycast.Raycast
 import me.anno.engine.ui.render.RenderView
@@ -15,6 +16,7 @@ import me.anno.io.files.FileReference
 import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.serialization.NotSerializedProperty
 import me.anno.io.serialization.SerializedProperty
+import me.anno.io.zip.InnerTmpFile
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFExport
 import me.anno.tsunamis.setups.FluidSimSetup
@@ -30,6 +32,7 @@ import org.apache.logging.log4j.LogManager
 import org.joml.Matrix4x3d
 import org.joml.Vector3d
 import org.joml.Vector3f
+import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -294,23 +297,36 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             setup.fillBathymetry(w, h, bathymetry)
             setup.fillMomentumX(w, h, fluidMomentumX)
             setup.fillMomentumY(w, h, fluidMomentumY)
-            setGhostOutflow(bathymetry)
+            setGhostOutflow(w, h, bathymetry)
         }
     }
+
+    @NotSerializedProperty
+    var computingThread: Thread? = null
 
     override fun onUpdate(): Int {
         if (ensureFieldSize() && !isPaused) {
             val dt = GFX.deltaTime * timeFactor
             if (dt > 0f) {
-                try {
-                    step(dt)
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                if (computingThread == null) {
+                    computingThread = thread {
+                        try {
+                            step(dt)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        GFX.addGPUTask(1) {
+                            invalidateMesh()
+                            computingThread = null
+                            // why is this function not called automatically?
+                            ensureBuffer()
+                        }
+                    }
                 }
             }
-            invalidateMesh()
+            // invalidateMesh()
             // why is this function not called automatically?
-            if (GFX.isGFXThread()) ensureBuffer()
+            // if (GFX.isGFXThread()) ensureBuffer()
         }
         return 1 // update every tick
     }
@@ -492,6 +508,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 }
             }
         }
+        // mesh.materials = fluidMaterialList
         generateRegularQuadHeightMesh(
             cw, ch, 0, cw, cellSizeMeters * w.toFloat() / cw.toFloat(), mesh.mesh2,
             object : TerrainUtils.HeightMap {
@@ -569,6 +586,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             } else break
             val t1 = System.nanoTime()
             if (t1 - t0 > 1e9 / 60f) break
+            Thread.sleep(0) // for interrupts
         }
         return done
     }
@@ -586,8 +604,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val h0 = fluidHeight
         val hu0 = fluidMomentumX
 
-        setGhostOutflow(h0)
-        setGhostOutflow(hu0)
+        setGhostOutflow(width, height, h0)
+        setGhostOutflow(width, height, hu0)
 
         val h1 = copy(h0, tmpH)
         val hu1 = copy(hu0, tmpHuX)
@@ -611,8 +629,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
         val hv1 = fluidMomentumY
 
-        setGhostOutflow(h1)
-        setGhostOutflow(hv1)
+        setGhostOutflow(width, height, h1)
+        setGhostOutflow(width, height, hv1)
 
         // copy data, only height has changed, so only height needs to be switched
         val h2 = copy(h1, h0)
@@ -641,12 +659,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     }
 
-    fun setGhostOutflow(v: FloatArray) {
+    fun setGhostOutflow(width: Int, height: Int, v: FloatArray) {
 
         // set the ghost zone to be outflow conditions
-        val width = width
-        val height = height
-
         for (y in -1..height) {
             val outside = getIndex(-1, y)
             val inside = getIndex(0, y)
@@ -736,7 +751,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         return dst
     }
 
-    fun distanceSquaredToLineSegment(vx: Float, vy: Float, wx: Float, wy: Float, px: Float, py: Float): Float {
+    /*fun distanceSquaredToLineSegment(vx: Float, vy: Float, wx: Float, wy: Float, px: Float, py: Float): Float {
         // from https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
         // return minimum distance between line segment vw and point p
         val dwx = wx - vx
@@ -754,7 +769,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val qx = dpx - t * dwx
         val qy = dpy - t * dwy
         return qx * qx + qy * qy
-    }
+    }*/
 
     override fun onEditMove(x: Float, y: Float, dx: Float, dy: Float): Boolean {
         if (Input.isLeftDown) {
@@ -883,6 +898,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     override fun onDestroy() {
         super.onDestroy()
         mesh2.destroy()
+        computingThread?.interrupt()
     }
 
     override val className: String = "Tsunamis/FluidSim"
@@ -890,6 +906,12 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     companion object {
         val threadPool = ProcessingGroup("TsunamiSim", 1f)
         val tmpV4ByThread = ThreadLocal2 { FloatArray(4) }
+        val fluidMaterialList by lazy {
+            val prefab = Prefab("Material")
+            prefab.createInstance() // ensure there is an instance
+            prefab.setProperty("shader", YTextureShader)
+            listOf(InnerTmpFile.InnerTmpPrefabFile(prefab))
+        }
         private val defaultColorMap = getReference("res://colormaps/globe.xml")
         private val LOGGER = LogManager.getLogger(FluidSim::class)
         private val f0 = FloatArray(0)

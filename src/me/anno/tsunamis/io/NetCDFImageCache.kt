@@ -4,6 +4,7 @@ import me.anno.cache.CacheSection
 import me.anno.io.files.FileReference
 import me.anno.io.files.InvalidRef
 import me.anno.tsunamis.io.NetCDFCache.loadFile
+import me.anno.utils.Clock
 import ucar.nc2.NetcdfFile
 import ucar.nc2.NetcdfFiles
 
@@ -11,7 +12,7 @@ object NetCDFImageCache : CacheSection("NetCDF-Images") {
 
     fun getData(bytes: ByteArray, variableName: String?): VariableImage? {
         synchronized(NetCDFMutex) {
-            val data = NetcdfFiles.openInMemory("?", bytes)
+            val data = NetcdfFiles.openInMemory(System.nanoTime().toString(), bytes)
             val image = getData(data, variableName)
             data.close()
             return image
@@ -29,21 +30,38 @@ object NetCDFImageCache : CacheSection("NetCDF-Images") {
     }
 
     fun getData(file: FileReference, variableName: String?, async: Boolean): VariableImage? {
-        if (!file.exists || file.isDirectory) return null
-        return getEntry(file, file.lastModified, 1000, async) { file1, _ ->
-            val data = loadFile(file1, false)
-            if (data == null) null else getData(data, variableName)
+        return getFileEntry(file, false, 30_000, async) { file1, _ ->
+            synchronized(NetCDFMutex) {
+                val c = Clock()
+                val data = loadFile(file1, false)
+                c.stop("Loading File")
+                val image = getData(data, variableName)
+                c.stop("Getting Data")
+                image
+            }
         } as? VariableImage
     }
 
-    private fun getData(data: NetcdfFile, variableName: String?): VariableImage? {
-        var variable = if (variableName != null) data.findVariable(variableName) else null
-        if (variable == null) {
-            variable = data.variables.firstOrNull {
-                it.shape.size in 1..2 && !it.isCoordinateVariable && !it.isMetadata && !it.isUnlimited
-            } ?: return null
+    private fun getData(data: NetcdfFile?, variableName: String?): VariableImage? {
+        data ?: return null
+        synchronized(NetCDFMutex) {
+            val c = Clock()
+            var variable = if (variableName != null) data.findVariable(variableName) else null
+            if (variable == null) {
+                variable = data.variables.firstOrNull {
+                    it.shape.size in 1..2 && !it.isCoordinateVariable && !it.isMetadata && !it.isUnlimited
+                } ?: return null
+            }
+            c.stop("Finding Variable")
+            return try {
+                val image = VariableImage(variable)
+                c.stop("Creating Variable Image")
+                image
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
         }
-        return VariableImage(variable)
     }
 
 }

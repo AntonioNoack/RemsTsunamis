@@ -257,10 +257,10 @@ object Compute {
         val hv = fluidSim.fluidMomentumY
         val bh = fluidSim.bathymetry
 
-        fluidSim.setGhostOutflow(fh)
-        fluidSim.setGhostOutflow(hu)
-        fluidSim.setGhostOutflow(hv)
-        fluidSim.setGhostOutflow(bh)
+        fluidSim.setGhostOutflow(w, h, fh)
+        fluidSim.setGhostOutflow(w, h, hu)
+        fluidSim.setGhostOutflow(w, h, hv)
+        fluidSim.setGhostOutflow(w, h, bh)
 
         val data = FloatArray(w * h * 4)
         for (y in 0 until h) {

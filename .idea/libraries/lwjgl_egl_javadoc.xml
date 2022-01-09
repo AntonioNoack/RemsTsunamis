@@ -1,13 +1,13 @@
 <component name="libraryTable">
   <library name="lwjgl-egl-javadoc">
     <CLASSES>
-      <root url="jar://$USER_HOME$/Downloads/lib/java/lwjgl323egl/lwjgl-egl.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/lwjgl-egl.jar!/" />
     </CLASSES>
     <JAVADOC>
-      <root url="jar://$USER_HOME$/Downloads/lib/java/lwjgl323egl/lwjgl-egl-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/lwjgl-egl-javadoc.jar!/" />
     </JAVADOC>
     <SOURCES>
-      <root url="jar://$USER_HOME$/Downloads/lib/java/lwjgl323egl/lwjgl-egl-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/lwjgl-egl-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

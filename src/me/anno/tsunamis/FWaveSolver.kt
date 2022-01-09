@@ -167,7 +167,7 @@ object FWaveSolver {
         sim.height = h
         val height = FloatArray((w + 2) * (h + 2))
         for (i in height.indices) height[i] = Math.random().toFloat()
-        sim.setGhostOutflow(height)
+        sim.setGhostOutflow(w, h, height)
         ImageWriter.writeImageFloat(w + 2, h + 2, "outflow.png", false, height)
     }
 
