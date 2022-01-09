@@ -1,8 +1,10 @@
 package me.anno.tsunamis
 
 import me.anno.ecs.annotations.*
+import me.anno.ecs.components.cache.MaterialCache
 import me.anno.ecs.components.mesh.ManualProceduralMesh
 import me.anno.ecs.components.mesh.ProceduralMesh
+import me.anno.ecs.components.mesh.TypeValue
 import me.anno.ecs.components.mesh.terrain.TerrainUtils
 import me.anno.ecs.components.mesh.terrain.TerrainUtils.generateRegularQuadHeightMesh
 import me.anno.ecs.interfaces.CustomEditMode
@@ -11,6 +13,9 @@ import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.engine.raycast.Raycast
 import me.anno.engine.ui.render.RenderView
 import me.anno.gpu.GFX
+import me.anno.gpu.shader.GLSLType
+import me.anno.gpu.texture.Texture2D
+import me.anno.image.raw.GPUImage
 import me.anno.input.Input
 import me.anno.io.files.FileReference
 import me.anno.io.files.FileReference.Companion.getReference
@@ -21,6 +26,7 @@ import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFExport
 import me.anno.tsunamis.setups.FluidSimSetup
 import me.anno.ui.editor.PropertyInspector
+import me.anno.utils.ShutdownException
 import me.anno.utils.hpc.HeavyProcessing.processBalanced
 import me.anno.utils.hpc.ProcessingGroup
 import me.anno.utils.hpc.ThreadLocal2
@@ -30,6 +36,7 @@ import me.anno.utils.maths.Maths.length
 import me.anno.utils.maths.Maths.mixARGB
 import org.apache.logging.log4j.LogManager
 import org.joml.Matrix4x3d
+import org.joml.Vector2f
 import org.joml.Vector3d
 import org.joml.Vector3f
 import kotlin.concurrent.thread
@@ -59,20 +66,44 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @Group("Visuals")
     @SerializedProperty
     var colorMap: FileReference = defaultColorMap
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateFluid()
+            }
+        }
 
     @Group("Visuals")
     @SerializedProperty
     var visualization = Visualisation.HEIGHT_MAP
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateFluid()
+            }
+        }
 
     @Group("Size")
     @Order(0)
     @SerializedProperty
     var width = 10
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateSetup()
+            }
+        }
 
     @Group("Size")
     @Order(1)
     @SerializedProperty
     var height = 10
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateSetup()
+            }
+        }
 
     @Group("Size")
     @Order(2)
@@ -82,7 +113,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         set(value) {
             if (field != value && value >= 1) {
                 field = value
-                invalidateMesh()
+                invalidateFluid()
                 invalidateBathymetryMesh()
             }
         }
@@ -95,7 +126,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         set(value) {
             if (field != value && value > 0f) {
                 field = value
-                invalidateMesh()
+                invalidateFluid()
                 invalidateBathymetryMesh()
             }
         }
@@ -141,6 +172,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @Group("Time")
     @SerializedProperty
     var isPaused = false
+        set(value) {
+            if (field != value) {
+                field = value
+                computingThread?.interrupt()
+                computingThread = null
+            }
+        }
 
     @Group("Time")
     @SerializedProperty
@@ -164,7 +202,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @Suppress("UNUSED")
     fun resetSimulation() {
         wantsReset = true
-        hasValidBathymetryMesh = false
+        invalidateFluid()
     }
 
     @DebugAction
@@ -173,11 +211,14 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val fluid = fluidHeight
         val bath = bathymetry
         if (fluid.size == bath.size) {
-            for (i in fluid.indices) {
-                fluid[i] = max(0f, -bath[i])
+            synchronized(workMutex) {
+                for (i in fluid.indices) {
+                    fluid[i] = max(0f, -bath[i])
+                }
+                fluidMomentumX.fill(0f)
+                fluidMomentumY.fill(0f)
             }
-            fluidMomentumX.fill(0f)
-            fluidMomentumY.fill(0f)
+            invalidateFluid()
         }
     }
 
@@ -201,6 +242,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     @NotSerializedProperty
     var hasValidBathymetryMesh = false
+
+    @NotSerializedProperty
+    val workMutex = Any()
+
+    val fluidTexture = Texture2D("Tsunami", 1, 1, 1)
+    val colorMapTexture = Texture2D("ColorMap", 128, 1, 1)
+    val fluidTexFile = InnerTmpFile.InnerTmpImageFile(GPUImage(fluidTexture, 4, true, false))
 
     fun getIndex(x: Int, y: Int): Int {
         val width = width
@@ -310,17 +358,19 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             if (dt > 0f) {
                 if (computingThread == null) {
                     computingThread = thread {
-                        try {
-                            step(dt)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                        synchronized(workMutex) {
+                            try {
+                                step(dt)
+                            } catch (e: ShutdownException) {
+                                // don't care
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            } finally {
+                                // must be called under all circumstances
+                                computingThread = null
+                            }
                         }
-                        GFX.addGPUTask(1) {
-                            invalidateMesh()
-                            computingThread = null
-                            // why is this function not called automatically?
-                            ensureBuffer()
-                        }
+                        invalidateFluid()
                     }
                 }
             }
@@ -397,6 +447,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         )
     }
 
+    @SerializedProperty
+    var useTextureData: Boolean = true
+
     private fun generateFluidMesh(mesh: ProceduralMesh) {
         val bathymetry = bathymetry
         val fluidHeight = fluidHeight
@@ -424,9 +477,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 }
             }
             Visualisation.MOMENTUM_X -> {
-                val maxMomentum = getMaxMomentum()
-                maxVisualizedValue = maxMomentum
-                val momentumScale = 1f / max(maxMomentum, 1e-38f)
+                maxVisualizedValue = getMaxValue(fluidMomentumX)
+                val momentumScale = 1f / max(maxVisualizedValue, 1e-38f)
                 if (colorMap == null) object : TerrainUtils.ColorMap {
                     override fun get(it: Int): Int {
                         val i = coarseIndexToFine(w, h, cw, scale, it)
@@ -443,9 +495,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 }
             }
             Visualisation.MOMENTUM_Y -> {
-                val maxMomentum = getMaxMomentum()
-                maxVisualizedValue = maxMomentum
-                val momentumScale = 1f / max(maxMomentum, 1e-38f)
+                maxVisualizedValue = getMaxValue(fluidMomentumY)
+                val momentumScale = 1f / max(maxVisualizedValue, 1e-38f)
                 if (colorMap == null) object : TerrainUtils.ColorMap {
                     override fun get(it: Int): Int {
                         val i = coarseIndexToFine(w, h, cw, scale, it)
@@ -462,9 +513,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 }
             }
             Visualisation.MOMENTUM -> {
-                val maxMomentum = getMaxMomentum() // not ideal
-                maxVisualizedValue = maxMomentum
-                val momentumScale = 1f / max(maxMomentum, 1e-38f)
+                maxVisualizedValue = max(getMaxValue(fluidMomentumX), getMaxValue(fluidMomentumY)) // not ideal
+                val momentumScale = 1f / max(maxVisualizedValue, 1e-38f)
                 if (colorMap == null) object : TerrainUtils.ColorMap {
                     override fun get(it: Int): Int {
                         val i = coarseIndexToFine(w, h, cw, scale, it)
@@ -481,16 +531,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 }
             }
             Visualisation.WATER_SURFACE -> {
-                var maxHeight = 0f
-                for (it in fluidHeight.indices) {
-                    val fh = fluidHeight[it]
-                    if (fh > 0f) {
-                        val s = abs(fh + bathymetry[it])
-                        if (s > maxHeight) maxHeight = s
-                    }
-                }
-                maxVisualizedValue = maxHeight
-                val heightScale = 1f / max(1e-38f, maxHeight)
+                maxVisualizedValue = getMaxValue(fluidHeight, bathymetry)
+                val heightScale = 1f / max(maxVisualizedValue, 1e-38f)
                 if (colorMap == null) object : TerrainUtils.ColorMap {
                     override fun get(it: Int): Int {
                         val i = coarseIndexToFine(w, h, cw, scale, it)
@@ -508,44 +550,135 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 }
             }
         }
-        // mesh.materials = fluidMaterialList
-        generateRegularQuadHeightMesh(
-            cw, ch, 0, cw, cellSizeMeters * w.toFloat() / cw.toFloat(), mesh.mesh2,
-            object : TerrainUtils.HeightMap {
-                override fun get(it: Int): Float {
-                    val i = coarseIndexToFine(w, h, cw, scale, it)
-                    return fluidHeight[i] + bathymetry[i]
+        val cellSize = cellSizeMeters * (w - 1f) / (cw - 1f)
+        if (useTextureData) {
+            mesh.materials = fluidMaterialList
+            val material = MaterialCache[fluidMaterialList[0]]
+            if (material != null) {
+                fluidTexture.setSize(cw, ch)
+                val floats = FloatArray(cw * ch * 4)
+                val r = fluidHeight
+                val g = fluidMomentumX
+                val b = fluidMomentumY
+                val a = bathymetry
+                for (i in 0 until cw * ch) {
+                    val j = i * 4
+                    val k = coarseIndexToFine(w, h, cw, scale, i)
+                    floats[j + 0] = r[k]
+                    floats[j + 1] = g[k]
+                    floats[j + 2] = b[k]
+                    floats[j + 3] = a[k]
                 }
-            },
-            object : TerrainUtils.NormalMap {
-                override fun get(x: Int, y: Int, i: Int, dst: Vector3f) {
-                    val cx = x * scale
-                    val cy = y * scale
-                    dst.x = getSurfaceHeightAt(cx + scale, cy) - getSurfaceHeightAt(cx - scale, cy)
-                    dst.y = cellSizeMeters * scale * 2f
-                    dst.z = getSurfaceHeightAt(cx, cy + scale) - getSurfaceHeightAt(cx, cy - scale)
-                    dst.normalize()
+                fluidTexture.autoUpdateMipmaps = false
+                fluidTexture.createRGBA(floats, false)
+                // material.diffuseMap = fluidTexFile
+                material.shaderOverrides["fluidData"] = TypeValue(GLSLType.S2D, fluidTexture)
+                if (colorMap != null) {
+                    colorMap.createTexture(colorMapTexture, false)
+                    material.shaderOverrides["colorMap"] = TypeValue(GLSLType.S2D, colorMapTexture)
+                    val delta = (colorMap.max - colorMap.min)
+                    val scale2 = Vector2f(1f / delta, colorMap.min / delta)
+                    material.shaderOverrides["colorMapScale"] = TypeValue(GLSLType.V2F, scale2)
                 }
-            },
-            getColor
-        )
+                material.shaderOverrides["cellSize"] = TypeValue(GLSLType.V1F, cellSize)
+                val cellOffset = Vector3f(cw * 0.5f * cellSize, 0f, ch * 0.5f * cellSize)
+                material.shaderOverrides["cellOffset"] = TypeValue(GLSLType.V3F, cellOffset)
+                material.shaderOverrides["visualization"] = TypeValue(GLSLType.V1I, visualization.id)
+                material.shaderOverrides["visScale"] = TypeValue(GLSLType.V1F, 1f / max(1e-38f, maxVisualizedValue))
+            }
+            val targetSize = (cw - 1) * (ch - 1) * 3 * 6
+            if (mesh.mesh2.positions?.size != targetSize) {
+                mesh.mesh2.positions = FloatArray(targetSize)
+                mesh.mesh2.normals = mesh.mesh2.positions // don't care about the values
+            }
+            mesh.mesh2.indices = null
+        } else {
+            mesh.materials = emptyList()
+            generateRegularQuadHeightMesh(
+                cw, ch, 0, cw, cellSize, mesh.mesh2,
+                object : TerrainUtils.HeightMap {
+                    override fun get(it: Int): Float {
+                        val i = coarseIndexToFine(w, h, cw, scale, it)
+                        return fluidHeight[i] + bathymetry[i]
+                    }
+                },
+                object : TerrainUtils.NormalMap {
+                    override fun get(x: Int, y: Int, i: Int, dst: Vector3f) {
+                        val cx = x * scale
+                        val cy = y * scale
+                        dst.x = getSurfaceHeightAt(cx + scale, cy) - getSurfaceHeightAt(cx - scale, cy)
+                        dst.y = cellSize * scale * 2f
+                        dst.z = getSurfaceHeightAt(cx, cy + scale) - getSurfaceHeightAt(cx, cy - scale)
+                        dst.normalize()
+                    }
+                },
+                getColor
+            )
+        }
     }
 
-    private fun getMaxMomentum(): Float {
-        val xs = fluidMomentumX
-        val ys = fluidMomentumY
-        var min = Float.POSITIVE_INFINITY
-        var max = Float.NEGATIVE_INFINITY
-        for (f in xs) {
-            if (f.isFinite()) {
-                if (f < min) min = f
-                if (f > max) max = f
+    private fun getMaxValue(data: FloatArray): Float {
+        var min = 0f
+        var max = 0f
+        // this is much too slow for large sizes,
+        // so only iterate over the output image
+        val w = width
+        val h = height
+        val scale = coarsening
+        val cw = ceilDiv(w, scale)
+        val ch = ceilDiv(h, scale)
+        // todo we could parallelize this
+        for (y in 0 until ch) {
+            var i = (y * h / ch) * w
+            for (x in 0 until cw) {
+                val f = data[i]
+                if (f.isFinite()) {
+                    if (f < min) min = f
+                    if (f > max) max = f
+                }
+                i += scale
             }
         }
-        for (f in ys) {
-            if (f.isFinite()) {
-                if (f < min) min = f
-                if (f > max) max = f
+        return max(-min, max)
+    }
+
+    private fun getMaxValue(fluid: FloatArray, bathy: FloatArray): Float {
+        var min = 0f
+        var max = 0f
+        // this is much too slow for large sizes,
+        // so only iterate over the output image
+        val w = width
+        val h = height
+        val scale = coarsening
+        // we could parallelize this,
+        // but it wouldn't bring that much probably
+        if (scale == 1) {
+            for (i in fluid.indices) {
+                val b = bathy[i]
+                if (b < 0f) {
+                    val s = fluid[i] + b
+                    if (s.isFinite()) {
+                        if (s < min) min = s
+                        if (s > max) max = s
+                    }
+                }
+            }
+        } else {
+            val cw = ceilDiv(w, scale)
+            val ch = ceilDiv(h, scale)
+            for (y in 0 until ch) {
+                var i = (y * h / ch) * w
+                for (x in 0 until cw) {
+                    val b = bathy[i]
+                    if (b < 0f) {
+                        val s = fluid[i] + b
+                        if (s.isFinite()) {
+                            if (s < min) min = s
+                            if (s > max) max = s
+                        }
+                    }
+                    i += scale
+                }
             }
         }
         return max(-min, max)
@@ -771,6 +904,82 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         return qx * qx + qy * qy
     }*/
 
+    private fun drawLineSegment(deltaTime: Float, cmp: Vector3f, lmp: Vector3f) {
+        // convert global hit coordinates into local space
+        // convert brush size into local coordinates
+        val brushSize = cmp.z * 0.1f / cellSizeMeters
+        // compute the area of effect
+        val cellMinX = max((min(cmp.x, lmp.x) - brushSize).toInt(), 0)
+        val cellMaxX = min((max(cmp.x, lmp.x) + brushSize).toInt(), width - 1)
+        val cellMinY = max((min(cmp.y, lmp.y) - brushSize).toInt(), 0)
+        val cellMaxY = min((max(cmp.y, lmp.y) + brushSize).toInt(), height - 1)
+        // compute brush strength
+        val brushStrength = (if (Input.isShiftDown) -1f else +1f) * 1e2f * deltaTime
+        // apply brush with circular falloff
+        val invBrushSize = 1f / brushSize
+        val fluidHeight = fluidHeight
+        val fluidMomentumX = fluidMomentumX
+        val fluidMomentumY = fluidMomentumY
+        val gravity = gravity
+        val minPerThread = 4000 / (cellMaxX - cellMinX)
+        processBalanced(cellMinY, cellMaxY + 1, minPerThread) { y0, y1 ->
+            val vx = cmp.x
+            val vy = cmp.y
+            val wx = lmp.x
+            val wy = lmp.y
+            val dwx = wx - vx
+            val dwy = wy - vy
+            val lineLengthSquared = dwx * dwx + dwy * dwy
+            val dwx2 = dwx / lineLengthSquared
+            val dwy2 = dwy / lineLengthSquared
+            for (yi in y0 until y1) {
+                for (xi in cellMinX..cellMaxX) {
+                    val px = xi.toFloat()
+                    val py = yi.toFloat()
+                    // minimum distance between line segment vw and point p, reformed a lot
+                    // from https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
+                    var dpx = px - vx
+                    var dpy = py - vy
+                    // "percentage" from cmp to lmp
+                    // val t = clamp(dpx * dwx + dpy * dwy, 0f, lineLengthSquared) * lineLengthSqInv
+                    val t = dpx * dwx2 + dpy * dwy2
+                    if (t in 0f..1f) {// on the left/right of the line segment
+                        // if we wouldn't have this if(), we'd draw caps at the end of the segment
+                        dpx -= t * dwx
+                        dpy -= t * dwy
+                        val d2 = dpx * dpx + dpy * dpy
+                        val index = getIndex(xi, yi)
+                        val strength = brushStrength * getNormalizedBrushShape(d2 * invBrushSize) *
+                                sqrt(fluidHeight[index] * gravity) * invBrushSize
+                        fluidMomentumX[index] += strength * dwx
+                        fluidMomentumY[index] += strength * dwy
+                    }
+                }
+            }
+        }
+        // something has changed, to update the mesh
+        invalidateFluid()
+    }
+
+    fun invalidateSetup() {
+        computingThread?.interrupt()
+        computingThread = null
+        invalidateFluid()
+    }
+
+    fun invalidateFluid() {
+        if (GFX.isGFXThread()) {
+            invalidateMesh()
+            // why is this not called automatically?
+            ensureBuffer()
+        } else {
+            GFX.addGPUTask(1) {
+                invalidateMesh()
+                ensureBuffer()
+            }
+        }
+    }
+
     override fun onEditMove(x: Float, y: Float, dx: Float, dy: Float): Boolean {
         if (Input.isLeftDown) {
             // critical velocity: sqrt(g*h), so make it that we draw that within 10s
@@ -785,60 +994,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                     val lmp = lastMousePos
                     getMousePos(cmp)
                     if (cmp.z > 0f && lmp.z > 0f && cmp != lmp) {
-                        // convert global hit coordinates into local space
-                        // convert brush size into local coordinates
-                        val brushSize = cmp.z * 0.1f / cellSizeMeters
-                        // compute the area of effect
-                        val cellMinX = max((min(cmp.x, lmp.x) - brushSize).toInt(), 0)
-                        val cellMaxX = min((max(cmp.x, lmp.x) + brushSize).toInt(), width - 1)
-                        val cellMinY = max((min(cmp.y, lmp.y) - brushSize).toInt(), 0)
-                        val cellMaxY = min((max(cmp.y, lmp.y) + brushSize).toInt(), height - 1)
-                        // compute brush strength
-                        val brushStrength = (if (Input.isShiftDown) -1f else +1f) * 1e4f * deltaTime
-                        // apply brush with circular falloff
-                        val invBrushSize = 1f / brushSize
-                        val fluidHeight = fluidHeight
-                        val fluidMomentumX = fluidMomentumX
-                        val fluidMomentumY = fluidMomentumY
-                        val gravity = gravity
-                        val minPerThread = 4000 / (cellMaxX - cellMinX)
-                        processBalanced(cellMinY, cellMaxY + 1, minPerThread) { y0, y1 ->
-                            val vx = cmp.x
-                            val vy = cmp.y
-                            val wx = lmp.x
-                            val wy = lmp.y
-                            val dwx = wx - vx
-                            val dwy = wy - vy
-                            val lineLengthSquared = dwx * dwx + dwy * dwy
-                            val dwx2 = dwx / lineLengthSquared
-                            val dwy2 = dwy / lineLengthSquared
-                            for (yi in y0 until y1) {
-                                for (xi in cellMinX..cellMaxX) {
-                                    val px = xi.toFloat()
-                                    val py = yi.toFloat()
-                                    // minimum distance between line segment vw and point p, reformed a lot
-                                    // from https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
-                                    var dpx = px - vx
-                                    var dpy = py - vy
-                                    // "percentage" from cmp to lmp
-                                    // val t = clamp(dpx * dwx + dpy * dwy, 0f, lineLengthSquared) * lineLengthSqInv
-                                    val t = dpx * dwx2 + dpy * dwy2
-                                    if (t in 0f..1f) {// on the left/right of the line segment
-                                        // if we wouldn't have this if(), we'd draw caps at the end of the segment
-                                        dpx -= t * dwx
-                                        dpy -= t * dwy
-                                        val d2 = dpx * dpx + dpy * dpy
-                                        val index = getIndex(xi, yi)
-                                        val strength = brushStrength * getNormalizedBrushShape(d2 * invBrushSize) *
-                                                sqrt(fluidHeight[index] * gravity) * invBrushSize
-                                        fluidMomentumX[index] += strength * dwx
-                                        fluidMomentumY[index] += strength * dwy
-                                    }
-                                }
-                            }
+                        synchronized(workMutex) {
+                            drawLineSegment(deltaTime, cmp, lmp)
                         }
-                        // something has changed, to update the mesh
-                        invalidateMesh()
                     }
                     // needs to be now (instead of when we started to process this update), so the system doesn't hang, when processing uses too much time
                     lastChange = System.nanoTime()
@@ -899,19 +1057,22 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         super.onDestroy()
         mesh2.destroy()
         computingThread?.interrupt()
+        fluidTexture.destroy()
     }
 
     override val className: String = "Tsunamis/FluidSim"
 
+    @NotSerializedProperty
+    val fluidMaterialList by lazy {
+        val prefab = Prefab("Material")
+        prefab.createInstance() // ensure there is an instance
+        prefab.setProperty("shader", YTextureShader)
+        listOf(InnerTmpFile.InnerTmpPrefabFile(prefab))
+    }
+
     companion object {
         val threadPool = ProcessingGroup("TsunamiSim", 1f)
-        val tmpV4ByThread = ThreadLocal2 { FloatArray(4) }
-        val fluidMaterialList by lazy {
-            val prefab = Prefab("Material")
-            prefab.createInstance() // ensure there is an instance
-            prefab.setProperty("shader", YTextureShader)
-            listOf(InnerTmpFile.InnerTmpPrefabFile(prefab))
-        }
+        val tmpV4ByThread = ThreadLocal2 { DoubleArray(4) }
         private val defaultColorMap = getReference("res://colormaps/globe.xml")
         private val LOGGER = LogManager.getLogger(FluidSim::class)
         private val f0 = FloatArray(0)

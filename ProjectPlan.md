@@ -1,5 +1,8 @@
 # Project Plan
 
+// todo stations
+
+
 ## Integration into Rem's Engine
 *until 10.01.2022, CPU compute*
 
@@ -13,16 +16,16 @@
 - [x] different visualizations (surface height, momentum in x/y direction, wave height)
 
 To save bandwidth, we could use a static, or even on-gpu-procedurally generated grid, where the height is read from a texture.
-- [ ] use custom vertex shader, and texture for height? (engine would need to be adjusted, as this isn't currently
+- [x] use custom vertex shader, and texture for height? (engine would need to be adjusted, as this isn't currently
   supported)
 
 Others:
 
-- [ ] draw force/impulse in a certain area
+- [x] draw force/impulse in a certain area
 - [x] restart button
 
-- [ ] it would be interesting to have different resolutions depending on the distance to the camera
-  (levels of detail)
+- [x] it would be interesting to have different resolutions depending on the distance to the camera
+  (levels of detail / output coarsening)
 
 ### NetCDF Support
 *until 10.01.2022*

@@ -126,6 +126,118 @@ object FWaveSolver {
         // if (dst.any { it.isNaN() }) throw RuntimeException("NaN from $h0 $h1, $hu0 $hu1, $b0 $b1, $gravity")
     }
 
+
+    fun solve(
+        i0: Int, i1: Int,
+        hSrc: FloatArray,
+        huSrc: FloatArray,
+        b: FloatArray,
+        hDst: FloatArray,
+        huDst: FloatArray,
+        gravity: Float,
+        scaling: Float,
+        tmp4f: DoubleArray
+    ) {
+
+        var h0 = hSrc[i0]
+        var h1 = hSrc[i1]
+
+        var b0 = b[i0]
+        var b1 = b[i1]
+
+        val wet0 = h0 > 0f
+        val wet1 = h1 > 0f
+
+        if (wet0 || wet1) {
+
+            var hu0 = huSrc[i0]
+            var hu1 = huSrc[i1]
+
+            // apply dry-wet condition
+            if (!wet0) {// left cell is dry
+                h0 = h1
+                b0 = b1
+                hu0 = -hu1
+            } else if (!wet1) {// right cell is dry
+                h1 = h0
+                b1 = b0
+                hu1 = -hu0
+            }
+
+            solve(
+                h0.toDouble(), h1.toDouble(),
+                hu0.toDouble(), hu1.toDouble(),
+                b0.toDouble(), b1.toDouble(),
+                gravity.toDouble(),
+                tmp4f
+            )
+
+            // apply changes left
+            if (wet0) {
+                hDst[i0] = (hDst[i0] - scaling * tmp4f[0]).toFloat()
+                huDst[i0] = (huDst[i0] - scaling * tmp4f[1]).toFloat()
+            }
+
+            // apply changes right
+            if (wet1) {
+                hDst[i1] = (hDst[i1] - scaling * tmp4f[2]).toFloat()
+                huDst[i1] = (huDst[i1] - scaling * tmp4f[3]).toFloat()
+            }
+
+        }
+    }
+
+    fun solve(
+        h0: Double, h1: Double,
+        hu0: Double, hu1: Double,
+        b0: Double, b1: Double,
+        gravity: Double,
+        dst: DoubleArray
+    ) {
+        // println("input: $h0 $h1 $hu0 $hu1 $b0 $b1 $gravity")
+        val roeHeight = (h0 + h1) * 0.5
+        val sqrt0 = sqrt(h0)
+        val sqrt1 = sqrt(h1)
+        val u0 = if (h0 > 0f) hu0 / h0 else 0.0
+        val u1 = if (h1 > 0f) hu1 / h1 else 0.0
+        val roeVelocity = (u0 * sqrt0 + u1 * sqrt1) / (sqrt0 + sqrt1)
+        val gravityTerm = sqrt(gravity * roeHeight)
+        val lambda0 = roeVelocity - gravityTerm
+        val lambda1 = roeVelocity + gravityTerm
+        val invDeltaLambda = 0.5 / gravityTerm
+        val bathymetryTermV2 = roeHeight * (b1 - b0)
+        val df0 = hu1 - hu0
+        val df1 = hu1 * u1 - hu0 * u0 + gravity * (0.5 * (h1 * h1 - h0 * h0) + bathymetryTermV2)
+        val deltaH0 = +(df0 * lambda1 - df1) * invDeltaLambda
+        val deltaH1 = -(df0 * lambda0 - df1) * invDeltaLambda
+        val deltaHu0 = deltaH0 * lambda0
+        val deltaHu1 = deltaH1 * lambda1
+        // println("dh: $deltaH0 $deltaH1 by $df0 $df1")
+        if (lambda0 < 0.0) {// first wave to the left
+            dst[0] = deltaH0
+            dst[1] = deltaHu0
+            dst[2] = 0.0
+            dst[3] = 0.0
+        } else {
+            dst[0] = 0.0
+            dst[1] = 0.0
+            dst[2] = deltaH0
+            dst[3] = deltaHu0
+        }
+        if (lambda1 < 0.0) {// second wave to the right
+            dst[0] += deltaH1
+            dst[1] += deltaHu1
+        } else {
+            dst[2] += deltaH1
+            dst[3] += deltaHu1
+        }
+        if (dst.any { it.isNaN() }) {
+            dst.fill(0.0)
+        }
+        // if (dst.any { it.isNaN() }) throw RuntimeException("NaN from $h0 $h1, $hu0 $hu1, $b0 $b1, $gravity")
+    }
+
+
     @JvmStatic
     fun main(args: Array<String>) {
 

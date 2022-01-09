@@ -7,6 +7,7 @@ import me.anno.gpu.framebuffer.Framebuffer
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeShader.Companion.bindTexture
 import me.anno.gpu.shader.ComputeTextureMode
+import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.ShaderLib
 import me.anno.gpu.shader.builder.Variable
 import me.anno.gpu.texture.Texture2D
@@ -172,7 +173,7 @@ object Compute {
     }
 
     val showWavesShader = ShaderLib.createShader(
-        "copy", ShaderLib.simplestVertexShader, listOf(Variable("vec2", "uv")), "" +
+        "copy", ShaderLib.simplestVertexShader, listOf(Variable(GLSLType.V2F, "uv")), "" +
                 "uniform sampler2D tex;\n" +
                 "void main(){\n" +
                 "   vec4 data = texture(tex, uv);\n" +
