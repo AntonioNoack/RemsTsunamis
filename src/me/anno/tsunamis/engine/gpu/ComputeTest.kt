@@ -161,7 +161,7 @@ object ComputeTest {
             for (i in 0 until numStepsPerFrame) {
                 step(sim.gravity, timeScale, src, tmp)
             }
-            maxValues.max(Reduction.reduce(src, Reduction.Operation.MAX_RA))
+            maxValues.max(Reduction.reduce(src, Reduction.MAX_RA))
             useFrame(srcFB) {
                 val shader = showWavesShader.value
                 shader.use()

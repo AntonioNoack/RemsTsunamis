@@ -39,8 +39,6 @@ Others:
 ### Basics
 *17.01.2022*
 
-- todo AMD gpu debugger?
-
 - [x] write graphics shaders
 - [x] write compute shaders
 
@@ -48,8 +46,10 @@ They probably will share the core components
 
 - [x] outflow boundary condition can be done using clamping (computed in graphics shaders anyways)
 
-- [ ] measure baseline performance & bandwidth
-- [ ] compare with theoretical hardware capabilities
+- [x] measure baseline performance & bandwidth
+- [x] compare with theoretical hardware capabilities
+
+- [x] take a look at AMD GPUOpen developer tools
 
 ### Performance Improvements
 *until 24.01.2022*
@@ -95,7 +95,7 @@ If not,
 
 I've done some first tests:
 - Java runs fine
-- LWJGL can call functions, but I need OpenGL
+- LWJGL can call functions, but OpenGL is needed
 
 OpenGL needs, as far as I know, a window context of some sort. 
 GLFW is the window library, that I usually use in Rem's Engine.
@@ -114,7 +114,8 @@ and the "Tesla P100-PCIE-16GB/PCIe/SSE2" GPU was correctly detected.
 
 ### Measurements
 *until 30.01.2022 (day before final presentation)*
-02.02. Mittwoch, 10:00
+
+*presentation maybe 02.02. (wednesday), 10:00*
 
 - [ ] measure performance
 - [ ] measure bandwidth

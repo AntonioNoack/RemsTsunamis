@@ -15,10 +15,28 @@ import org.lwjgl.opengl.GL42C
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/**
- * is intended to reduce a value on the gpu; not yet working
- * */
 object Reduction {
+
+    data class Operation(
+        val name: String,
+        val startValue: String,
+        val function: String
+    )
+
+    /** finds the maximum value of all, so the brightest pixel */
+    val MAX = Operation("max", "1e-38", "max(a,b)")
+
+    /** finds the minimum value of all, so the darkest pixel */
+    val MIN = Operation("min", "1e38", "min(a,b)")
+
+    /** finds the sum of all pixels */
+    val SUM = Operation("sum", "0.0", "a+b")
+
+    /** finds the maximum amplitude */
+    val MAX_ABS = Operation("max-abs", "0.0", "max(abs(a),abs(b))")
+
+    /** finds the maximum amplitude of the surface where water is */
+    val MAX_RA = Operation("max-ra", "0.0", "max(a, vec4(b.x > 0.0 ? abs(b.x + b.w) : 0.0, b.yz, 0.0))")
 
     private const val reduction = 16
 
@@ -32,7 +50,7 @@ object Reduction {
 
         val shader = shaderByType.getOrPut(op) {
             ComputeShader(
-                "reduction", Vector2i(16, 16), "" +
+                "reduce-${op.name}", Vector2i(16, 16), "" +
                         "layout(rgba32f, binding = 0) uniform image2D src;\n" +
                         "layout(rgba32f, binding = 1) uniform image2D dst;\n" +
                         "uniform ivec2 inSize, outSize;\n" +

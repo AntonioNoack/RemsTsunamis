@@ -17,3 +17,15 @@ The solution to that was to add a timeout to applying steps.
 ## ...
 
 Fixed boundary condition bug, fixed drawing code :)
+
+Defined "engine/solver types", so how and where the simulation is run, e.g. cpu / gpu graphics pipeline
+
+Fixed NetCDF loading code: off by 1 error
+
+Created performance test
+
+Created UI panel for color map preview
+
+## First Measurements
+
+While all measurements look rather slow, the GPU with compute is currently upto 1000x faster than Kotlin.
