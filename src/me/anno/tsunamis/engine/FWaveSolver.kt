@@ -1,7 +1,8 @@
-package me.anno.tsunamis
+package me.anno.tsunamis.engine
 
 import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference.Companion.getReference
+import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.setups.FluidSimSetup
 import me.anno.tsunamis.setups.LinearDiscontinuity
 import org.apache.logging.log4j.LogManager
@@ -267,7 +268,7 @@ object FWaveSolver {
         setup.borderHeight = 1.0f
         sim.setup = setup
         sim.ensureFieldSize()
-        val height = sim.fluidHeight
+        val height = (sim.engine as CPUEngine).fluidHeight
         ImageWriter.writeImageFloat(w + 2, h + 2, "border.png", false, height)
     }
 

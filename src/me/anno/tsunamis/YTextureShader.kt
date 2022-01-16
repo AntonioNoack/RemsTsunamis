@@ -31,6 +31,9 @@ object YTextureShader : ECSMeshShader("YTexture") {
         list.add(Variable(GLSLType.V3F, "cellOffset"))
         list.add(Variable(GLSLType.V1F, "visScale"))
         list.add(Variable(GLSLType.V1I, "visualization"))
+        list.add(Variable(GLSLType.V4F, "heightMask"))
+        list.add(Variable(GLSLType.V4F, "visualMask"))
+        list.add(Variable(GLSLType.V1F, "fluidHeightScale"))
         return list
     }
 
@@ -50,34 +53,40 @@ object YTextureShader : ECSMeshShader("YTexture") {
                     // create x,z coordinates from vertex index
                     // create y,normal from texture data
                     "int lod = 0;\n" +
-                    "#define SURFACE(h) (h.r + h.a)\n" +
+                    "#define SURFACE(h) dot(h, heightMask)\n" +
+                    "#define SURFACE2(h) dot(h, heightMask) * (h.r > 0.0 ? fluidHeightScale : 1.0)\n" +
                     "#define TEXTURE fluidData\n" +
-                    "#define getColor11(v) v < 0.0 ? mix(vec3(0.0,0.33,1.0), vec3(1.0), fract(v)) : mix(vec3(1.0), vec3(1.0,0.0,0.0), v)\n" +
+                    "#define getColor11(v) v < 0.0 ? " +
+                    "   mix(vec3(0.0,0.33,1.0), vec3(1.0), clamp(v+1.0, 0.0, 1.0)) : " +
+                    "   mix(vec3(1.0), vec3(1.0,0.0,0.0), clamp(v, 0.0, 1.0))\n" +
                     "ivec2 fieldSize = textureSize(TEXTURE, lod);\n" +
                     "int cellIndex  = gl_VertexID / 6;\n" +
                     "int partOfCell = gl_VertexID % 6;\n" +
                     "int deltaX[6] = { 0, 1, 1, 1, 0, 0 };\n" +
                     "int deltaY[6] = { 0, 0, 1, 1, 0, 1 };\n" +
                     "int numCellsX = max(1, fieldSize.x - 1);\n" +
+                    "int numCellsY = max(1, fieldSize.y - 1);\n" +
+                    "ivec2 numCells = ivec2(numCellsX, numCellsY);\n" +
                     "int cellX = cellIndex % numCellsX + deltaX[partOfCell];\n" +
                     "int cellY = cellIndex / numCellsX + deltaY[partOfCell];\n" +
                     "ivec2 cell = ivec2(cellX, cellY);\n" +
                     "vec2 invFieldSize = 1.0 / vec2(fieldSize-1);\n" +
                     "vec2 uv = vec2(cellX, cellY) * invFieldSize;\n" + // [0,1]
-                    "vec4 data = texelFetch(TEXTURE, cell, lod);\n" +
-                    "localPosition = vec3(float(cellX) * cellSize, SURFACE(data), float(cellY) * cellSize) - cellOffset;\n" +
+                    "vec4 data = texelFetch(TEXTURE, clamp(cell, ivec2(0), numCells), lod);\n" +
+                    "localPosition = vec3(float(cellX) * cellSize, SURFACE2(data), float(cellY) * cellSize) + cellOffset;\n" +
                     "#ifdef COLORS\n" +
                     // calculate the normals
-                    "   vec4 dxp = texelFetch(TEXTURE, cell + ivec2(1, 0), lod);\n" +
-                    "   vec4 dxm = texelFetch(TEXTURE, cell - ivec2(1, 0), lod);\n" +
-                    "   vec4 dyp = texelFetch(TEXTURE, cell + ivec2(0, 1), lod);\n" +
-                    "   vec4 dym = texelFetch(TEXTURE, cell - ivec2(0, 1), lod);\n" +
+                    "   vec4 dxp = texelFetch(TEXTURE, clamp(cell + ivec2(1, 0), ivec2(0), numCells), lod);\n" +
+                    "   vec4 dxm = texelFetch(TEXTURE, clamp(cell - ivec2(1, 0), ivec2(0), numCells), lod);\n" +
+                    "   vec4 dyp = texelFetch(TEXTURE, clamp(cell + ivec2(0, 1), ivec2(0), numCells), lod);\n" +
+                    "   vec4 dym = texelFetch(TEXTURE, clamp(cell - ivec2(0, 1), ivec2(0), numCells), lod);\n" +
                     "   vec3 normals = normalize(vec3(\n" +
-                    "       SURFACE(dxp) - SURFACE(dxm),\n" +
+                    "       SURFACE2(dxp) - SURFACE2(dxm),\n" +
                     "       cellSize * 2.0,\n" +
-                    "       SURFACE(dyp) - SURFACE(dym)\n" +
+                    "       SURFACE2(dyp) - SURFACE2(dym)\n" +
                     "   ));\n" +
-                    "   vec3 tangents = vec3(1.0, 0.0, 0.0);\n" + // should be done more properly
+                    // should be done more properly, but it's only used for effects we don't need, so it doesn't really matter
+                    "   vec3 tangents = vec3(1.0, 0.0, 0.0);\n" +
                     "#endif\n" +
                     "#ifdef INSTANCED\n" +
                     "   mat4x3 localTransform = mat4x3(instanceTrans0, instanceTrans1, instanceTrans2);\n" +
@@ -101,17 +110,16 @@ object YTextureShader : ECSMeshShader("YTexture") {
                     "#ifdef COLORS\n" +
                     "   normal = normalize(normal);\n" +
                     "   float v = 0;\n" +
-                    "   vertexColor = texture(colorMap, vec2(data.a * colorMapScale.x + colorMapScale.y, 0.0));\n" +
+                    "   vertexColor = vec4(texture(colorMap, vec2(data.a * colorMapScale.x + colorMapScale.y, 0.0)).rgb, 1.0);\n" +
                     "   if(data.a < 0.0 && visualization != ${Visualisation.HEIGHT_MAP.id}){\n" +
                     "       switch(visualization){\n" +
-                    "       case ${Visualisation.WATER_SURFACE.id}:\n" +
-                    "           v = (data.r + data.a) * visScale;break;\n" +
-                    "       case ${Visualisation.MOMENTUM_X.id}:\n" +
-                    "           v = data.g * visScale;break;\n" +
-                    "       case ${Visualisation.MOMENTUM_Y.id}:\n" +
-                    "           v = data.b * visScale;break;\n" +
                     "       case ${Visualisation.MOMENTUM.id}:\n" +
                     "           v = length(vec2(data.gb)) * visScale;break;\n" +
+                    // "       case ${Visualisation.WATER_SURFACE.id}:\n" +
+                    // "       case ${Visualisation.MOMENTUM_X.id}:\n" +
+                    // "       case ${Visualisation.MOMENTUM_Y.id}:\n" +
+                    "       default:\n" +
+                    "           v = dot(visualMask, data);break;\n" +
                     "       }\n" +
                     "       vertexColor = vec4(getColor11(v), 1.0);\n" +
                     "   }\n" +

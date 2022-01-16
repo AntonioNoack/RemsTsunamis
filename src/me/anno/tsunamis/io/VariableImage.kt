@@ -1,9 +1,11 @@
 package me.anno.tsunamis.io
 
+import me.anno.config.DefaultStyle.black
 import me.anno.image.Image
+import me.anno.image.colormap.LinearColorMap
+import me.anno.maths.Maths.clamp
+import me.anno.maths.Maths.mix
 import me.anno.utils.Clock
-import me.anno.utils.maths.Maths.clamp
-import me.anno.utils.maths.Maths.mix
 import ucar.ma2.DataType
 import ucar.nc2.Variable
 import java.awt.image.BufferedImage
@@ -55,16 +57,19 @@ class VariableImage(variable: Variable) : Image(
     private val wm2 = width - 2f
     private val hm2 = height - 2f
 
-    private val invDelta255x = 255f / max(1e-38f, max(max, -min))
+    private val colorMap = LinearColorMap(
+        1f / max(1e-38f, max(max, -min)),
+        LinearColorMap.negInfColor,
+        0x0055ff or black, // blue
+        0xffffff or black, // white
+        0xff0000 or black, // red
+        LinearColorMap.posInfColor,
+        LinearColorMap.nanColor
+    )
 
     override fun getRGB(p0: Int): Int {
         // if there is a special name like height or bathymetry, we could apply different color maps
-        val v = data[p0]
-        val f0255 = abs(v) * invDelta255x
-        return if (f0255.isFinite()) {
-            val baseColor = if (v < 0f) 0x10000 else 0x10101
-            f0255.roundToInt() * baseColor or 0xff.shl(24)
-        } else 0xffff00ff.toInt()
+        return colorMap.getColor(data[p0])
     }
 
     fun getValue(x: Int, y: Int): Float {

@@ -15,10 +15,10 @@ import me.anno.utils.Color.g
 import me.anno.utils.Color.r
 import me.anno.utils.Color.rgba
 import me.anno.utils.files.Files.use
-import me.anno.utils.maths.Maths.max
-import me.anno.utils.maths.Maths.min
-import me.anno.utils.maths.Maths.mix
-import me.anno.utils.maths.Maths.mixARGB
+import me.anno.maths.Maths.max
+import me.anno.maths.Maths.min
+import me.anno.maths.Maths.mix
+import me.anno.maths.Maths.mixARGB
 import me.anno.utils.structures.arrays.FloatArrayList
 import me.anno.utils.structures.arrays.IntArrayList
 import org.joml.Vector3f

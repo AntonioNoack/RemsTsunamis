@@ -1,7 +1,7 @@
 # Project Plan
 
 // todo stations
-
+// todo color scale
 
 ## Integration into Rem's Engine
 *until 10.01.2022, CPU compute*
@@ -38,6 +38,9 @@ Others:
 ## GLSL vs Compute
 ### Basics
 *17.01.2022*
+
+todo [ ] fix scenario y flipped
+todo [ ] color scale thingy
 
 - [ ] write graphics shaders
 - [x] write compute shaders
@@ -112,6 +115,7 @@ and the "Tesla P100-PCIE-16GB/PCIe/SSE2" GPU was correctly detected.
 
 ### Measurements
 *until 30.01.2022 (day before final presentation)*
+02.02. Mittwoch, 10:00
 
 - [ ] measure performance
 - [ ] measure bandwidth

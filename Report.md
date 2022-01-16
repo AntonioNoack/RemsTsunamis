@@ -13,3 +13,7 @@ When I created the mode to draw waves in real-time, I had the issue that it was 
 The cause of that issue was that mouse-motion events were used, and they are captured & processed, no matter how many per frame.
 Before an update was completely processed, the next event would be registered for processing.
 The solution to that was to add a timeout to applying steps.
+
+## ...
+
+Fixed boundary condition bug, fixed drawing code :)

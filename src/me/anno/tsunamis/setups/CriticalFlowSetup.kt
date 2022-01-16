@@ -4,8 +4,8 @@ import me.anno.ecs.annotations.DebugProperty
 import me.anno.ecs.annotations.Docs
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
-import me.anno.utils.maths.Maths.mix
-import me.anno.utils.maths.Maths.pow
+import me.anno.maths.Maths.mix
+import me.anno.maths.Maths.pow
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.sqrt

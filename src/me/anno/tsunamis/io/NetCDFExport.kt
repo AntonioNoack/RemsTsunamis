@@ -2,8 +2,10 @@ package me.anno.tsunamis.io
 
 import me.anno.io.files.FileReference
 import me.anno.tsunamis.FluidSim
+import me.anno.tsunamis.engine.CPUEngine
 import me.anno.utils.OS.documents
 import me.anno.utils.Sleep.waitUntil
+import me.anno.utils.hpc.HeavyProcessing.processBalanced
 import ucar.ma2.DataType
 import ucar.ma2.Index
 import ucar.nc2.write.NetcdfFormatWriter
@@ -12,12 +14,14 @@ import kotlin.concurrent.thread
 object NetCDFExport {
 
     private fun removeBorder(width: Int, height: Int, src: FloatArray, dst: FloatArray): FloatArray {
-        for (y in 0 until height) {
-            val srcI0 = (width + 2) * (y + 1) + 1
-            val srcI1 = srcI0 + width
-            val dstDelta = width * y - srcI0 // < 0
-            for (srcI in srcI0 until srcI1) {
-                dst[srcI + dstDelta] = src[srcI]
+        processBalanced(0, height, false) { y0, y1 ->
+            for (y in y0 until y1) {
+                val srcI0 = (width + 2) * (y + 1) + 1
+                val srcI1 = srcI0 + width
+                val dstDelta = width * y - srcI0 // < 0
+                for (srcI in srcI0 until srcI1) {
+                    dst[srcI + dstDelta] = src[srcI]
+                }
             }
         }
         return dst
@@ -34,10 +38,12 @@ object NetCDFExport {
         val height = sim.height // height without ghost cells
 
         // values
-        val h = sim.fluidHeight
-        val b = sim.bathymetry
-        val hu = sim.fluidMomentumX
-        val hv = sim.fluidMomentumY
+        // todo request these values as a large chunk of data
+        val engine = sim.engine as CPUEngine
+        val h = engine.fluidHeight
+        val b = engine.bathymetry
+        val hu = engine.fluidMomentumX
+        val hv = engine.fluidMomentumY
         val setup = sim.setup!!
 
         // is this part thread-safe?
@@ -70,7 +76,7 @@ object NetCDFExport {
 
             // each dimension is defined by the name, or an integer for its size (becomes an anonymous dimension)
             // multiple dimensions are split by space/tab/newline
-            val dimString = "$xName $yName"
+            val dimString = "$yName $xName"
             builder.addVariable(bName, dataType, dimString)
             builder.addVariable(hName, dataType, dimString)
             builder.addVariable(huName, dataType, dimString)
@@ -100,10 +106,12 @@ object NetCDFExport {
             // fill temporary array with displacement
             val dx = if (writeGhostCells) -1 else 0
             val dy = if (writeGhostCells) -1 else 0
-            for (y in 0 until writtenHeight) {// could be parallelized, but is more for debugging anyways
-                var i = y * writtenWidth
-                for (x in 0 until writtenWidth) {
-                    tmp[i++] = setup.getDisplacement(x + dx, y + dy, width, height)
+            processBalanced(dy, dy + writtenHeight, false) { y0, y1 ->
+                for (y in y0 until y1) {
+                    var i = (y - dy) * writtenWidth
+                    for (x in dx until dx + writtenWidth) {
+                        tmp[i++] = setup.getDisplacement(x, y, width, height)
+                    }
                 }
             }
 

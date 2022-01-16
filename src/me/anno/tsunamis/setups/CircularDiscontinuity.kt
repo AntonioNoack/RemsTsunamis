@@ -2,9 +2,9 @@ package me.anno.tsunamis.setups
 
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
-import me.anno.utils.maths.Maths.clamp
-import me.anno.utils.maths.Maths.length
-import me.anno.utils.maths.Maths.mix
+import me.anno.maths.Maths.clamp
+import me.anno.maths.Maths.length
+import me.anno.maths.Maths.mix
 import org.joml.Vector2f.lengthSquared
 import kotlin.math.max
 
