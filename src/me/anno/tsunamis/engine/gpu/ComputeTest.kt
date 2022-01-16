@@ -13,14 +13,17 @@ import me.anno.gpu.texture.Texture2D
 import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
+import me.anno.tsunamis.engine.TsunamiEngine.Companion.getMaxValue
 import me.anno.tsunamis.engine.gpu.ComputeEngine.Companion.step
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.setups.CircularDiscontinuity
 import me.anno.tsunamis.setups.LinearDiscontinuity
 import me.anno.tsunamis.setups.NetCDFSetup
 import me.anno.utils.OS.desktop
+import me.anno.utils.types.Vectors.print
 import me.anno.video.VideoCreator.Companion.renderVideo
 import org.apache.logging.log4j.LogManager
+import org.joml.Vector4f
 
 object ComputeTest {
 
@@ -35,8 +38,8 @@ object ComputeTest {
                 "void main(){\n" +
                 "   vec4 data = texture(tex, uv);\n" +
                 "   float surface = scale.x * (data.x + data.w);\n" +
-                "   vec2 momentum = clamp(data.yz * scale.yz, vec2(0.0), vec2(1.0));\n" +
-                "   gl_FragColor = vec4(vec3(surface)\n" +
+                "   vec2 momentum = clamp(data.yz * scale.yz, vec2(-1.0), vec2(1.0));\n" +
+                "   gl_FragColor = vec4(vec3(surface + 0.5)\n" +
                 "        + vec3( 1.0, 0.0, -1.0) * momentum.x\n" +
                 "        + vec3(-0.5, 1.0, -0.5) * momentum.y, 1.0);\n" +
                 "}", listOf("tex")
@@ -57,7 +60,7 @@ object ComputeTest {
         val w = 1024
         val h = 1024 / 2 // w * 60 / 108
         val numFrames = 500
-        val numStepsPerFrame = 50
+        val numStepsPerFrame = 10
 
         val setupType = 2
 
@@ -68,11 +71,12 @@ object ComputeTest {
         HiddenOpenGLContext.createOpenGL(w, h)
         ShaderLib.init()
 
-        val fluidSim = FluidSim()
-        fluidSim.computeOnly = true
-        fluidSim.width = w
-        fluidSim.height = h
-        fluidSim.cellSizeMeters = 100f
+        val sim = FluidSim()
+        sim.computeOnly = true
+        sim.width = w
+        sim.height = h
+        sim.cellSizeMeters = 100f
+        var maxMomentum = 0f
 
         when (setupType) {
             0 -> {
@@ -81,7 +85,7 @@ object ComputeTest {
                 setup.heightRight = 1.0f
                 setup.hasBorder = true
                 setup.borderHeight = 10f
-                fluidSim.setup = setup
+                sim.setup = setup
             }
             1 -> {
                 val setup = CircularDiscontinuity()
@@ -89,7 +93,7 @@ object ComputeTest {
                 setup.heightOuter = 1.0f
                 setup.hasBorder = true
                 setup.borderHeight = 10f
-                fluidSim.setup = setup
+                sim.setup = setup
             }
             2 -> {
                 val setup = NetCDFSetup()
@@ -99,13 +103,14 @@ object ComputeTest {
                 setup.hasBorder = true
                 setup.borderHeight = 10f
                 val originalWidth = 10800
-                fluidSim.cellSizeMeters = 250f * originalWidth / w
-                fluidSim.setup = setup
+                sim.cellSizeMeters = 250f * originalWidth / w
+                sim.setup = setup
+                maxMomentum = 1314f // computed using Reduction
             }
         }
 
-        val setup = fluidSim.setup ?: throw RuntimeException("Simulation needs setup")
-        while (!fluidSim.ensureFieldSize()) {
+        val setup = sim.setup ?: throw RuntimeException("Simulation needs setup")
+        while (!sim.ensureFieldSize()) {
             LOGGER.info("Waiting for setup to load")
             Thread.sleep(500)
         }
@@ -115,18 +120,18 @@ object ComputeTest {
         val src = Texture2D("src", w, h, 1)
         val tmp = Texture2D("tmp", w, h, 1)
 
-        val engine = fluidSim.engine as CPUEngine
-        fluidSim.setGhostOutflow(w, h, engine.fluidHeight)
-        fluidSim.setGhostOutflow(w, h, engine.fluidMomentumX)
-        fluidSim.setGhostOutflow(w, h, engine.fluidMomentumY)
-        fluidSim.setGhostOutflow(w, h, engine.bathymetry)
+        val engine = sim.engine as CPUEngine
+        sim.setGhostOutflow(w, h, engine.fluidHeight)
+        sim.setGhostOutflow(w, h, engine.fluidMomentumX)
+        sim.setGhostOutflow(w, h, engine.fluidMomentumY)
+        sim.setGhostOutflow(w, h, engine.bathymetry)
 
         val data = createTextureData(w, h, engine)
         src.createRGBA(data, false)
         tmp.createRGBA(data, false)
 
-        val maxTimeStep = fluidSim.computeMaxTimeStep()
-        val timeScale = maxTimeStep / fluidSim.cellSizeMeters
+        val maxTimeStep = sim.computeMaxTimeStep()
+        val timeScale = maxTimeStep / sim.cellSizeMeters
 
         // call barrier for memory read
         // glMemoryBarrier(GL_PIXELBUFFER_BARRIER_BIT)
@@ -148,21 +153,26 @@ object ComputeTest {
          ImageWriter.writeImageFloat(w + 2, h + 2, "hv.png", normalize, hv)
          ImageWriter.writeImageFloat(w + 2, h + 2, "b.png", normalize, bh)*/
 
+        val maxFluidHeight = getMaxValue(sim.width, sim.height, sim.coarsening, engine.fluidHeight, engine.bathymetry)
+
+        val maxValues = Vector4f()
         val srcFB = Framebuffer("src", w2, h2, 1, 1, true, DepthBufferType.NONE)
         renderVideo(w2, h2, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB) { callback ->
             for (i in 0 until numStepsPerFrame) {
-                step(fluidSim.gravity, timeScale, src, tmp)
+                step(sim.gravity, timeScale, src, tmp)
             }
+            maxValues.max(Reduction.reduce(src, Reduction.Operation.MAX_RA))
             useFrame(srcFB) {
                 val shader = showWavesShader.value
                 shader.use()
-                // todo compute maximum values, and divide
-                shader.v3("scale", 1f, 0.01f, 0.01f)
+                shader.v3("scale", 1f / maxFluidHeight, 1f / maxMomentum, 1f / maxMomentum)
                 src.bind(0)
                 GFX.flat01.draw(shader)
             }
             callback()
         }
+
+        LOGGER.info("Maximum values: ${maxValues.print()}")
 
         Engine.requestShutdown()
 

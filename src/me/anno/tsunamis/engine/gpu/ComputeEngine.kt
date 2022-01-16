@@ -108,7 +108,7 @@ class ComputeEngine(width: Int, height: Int) : CPUEngine(width, height) {
                         GLSLSolver.fWaveSolverHalf +
                         "void main(){\n" +
                         "   ivec2 uv1 = ivec2(gl_GlobalInvocationID.xy);\n" +
-                        "   if(uv1.x < textureSize.x && uv1.y < textureSize.y){\n" +
+                        "   if(uv1.x <= maxUV.x && uv1.y <= maxUV.y){\n" +
                         "       ivec2 deltaUV = ivec2(${if (x) "1,0" else "0,1"});\n" +
                         "       vec4 data0 = imageLoad(src, clamp(uv1 - deltaUV, ivec2(0), maxUV));\n" + // left/top
                         "       vec4 data1 = imageLoad(src, uv1);\n" +
@@ -134,6 +134,7 @@ class ComputeEngine(width: Int, height: Int) : CPUEngine(width, height) {
             shader.v1("gravity", gravity)
             ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
             ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            shader.runBySize(src.w, src.h)
         }
 
         fun step(gravity: Float, timeScale: Float, src: Texture2D, tmp: Texture2D) {
