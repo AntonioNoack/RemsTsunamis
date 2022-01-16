@@ -29,3 +29,7 @@ Created UI panel for color map preview
 ## First Measurements
 
 While all measurements look rather slow, the GPU with compute is currently upto 1000x faster than Kotlin.
+
+Then I noticed that I forgot to set the scene size, and the test was only running on a 10x10 field.
+
+With the corrected test (field of 10800 x 6000), the results look reasonable, and GLSL on the GPU is about 50x faster than Kotlin on my CPU.
