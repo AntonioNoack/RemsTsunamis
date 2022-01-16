@@ -27,6 +27,8 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     abstract fun supportsAsyncCompute(): Boolean
 
+    open fun synchronize() {}
+
     abstract fun setZero()
 
     abstract fun supportsMesh(): Boolean

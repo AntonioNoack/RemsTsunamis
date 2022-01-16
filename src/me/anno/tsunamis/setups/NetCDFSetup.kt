@@ -3,12 +3,14 @@ package me.anno.tsunamis.setups
 import me.anno.ecs.annotations.DebugProperty
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
+import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference
 import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.serialization.SerializedProperty
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.io.NetCDFImageCache.getData
 import me.anno.tsunamis.io.VariableImage
+import me.anno.utils.Sleep.waitUntil
 import me.anno.utils.hpc.HeavyProcessing.processBalanced
 
 class NetCDFSetup : FluidSimSetup() {
@@ -137,7 +139,7 @@ class NetCDFSetup : FluidSimSetup() {
                         var x0In = 0
                         val y0In = y * oh / h
                         val y1In = (y + 1) * oh / h
-                        var i = (y + 1) * (w + 2)
+                        var i = 1 + (y + 1) * (w + 2)
                         for (x in 0 until w) {
                             val x1In = (x + 1) * ow / w
                             var sum = 0f
@@ -158,7 +160,7 @@ class NetCDFSetup : FluidSimSetup() {
                 val sy = oh.toFloat() / h
                 threadPool.processBalanced(0, h, true) { y0, y1 ->
                     for (y in y0 until y1) {
-                        var i = (y + 1) * (w + 2)
+                        var i = 1 + (y + 1) * (w + 2)
                         for (x in 0 until w) {
                             dst[i++] += variable.getValue(x * sx, y * sy)
                         }
@@ -168,7 +170,7 @@ class NetCDFSetup : FluidSimSetup() {
                 // just read the values from the correct positions
                 threadPool.processBalanced(0, h, true) { y0, y1 ->
                     for (y in y0 until y1) {
-                        var i = (y + 1) * (w + 2)
+                        var i = 1 + (y + 1) * (w + 2)
                         for (x in 0 until w) {
                             dst[i++] += variable.getValue(x * ow / w, y * oh / h)
                         }
@@ -195,5 +197,20 @@ class NetCDFSetup : FluidSimSetup() {
     }
 
     override val className: String = "Tsunamis/NetCDFSetup"
+
+    companion object {
+
+        @JvmStatic
+        fun main(args: Array<String>) {
+            val setup = NetCDFSetup()
+            waitUntil(true) { setup.isReady() }
+            val w = setup.dataWidth
+            val h = setup.dataHeight
+            val bath = FloatArray((w + 2) * (h + 2))
+            setup.fillBathymetry(w, h, bath)
+            ImageWriter.writeImageFloat(w+2, h+2, "bath.png", true, bath)
+        }
+
+    }
 
 }

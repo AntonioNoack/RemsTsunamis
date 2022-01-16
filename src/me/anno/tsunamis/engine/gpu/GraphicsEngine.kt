@@ -1,7 +1,6 @@
 package me.anno.tsunamis.engine.gpu
 
 import me.anno.gpu.GFX
-import me.anno.gpu.OpenGL
 import me.anno.gpu.OpenGL.renderPurely
 import me.anno.gpu.OpenGL.useFrame
 import me.anno.gpu.framebuffer.DepthBufferType
@@ -15,6 +14,7 @@ import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.setups.FluidSimSetup
+import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL20
 
 class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
@@ -48,6 +48,11 @@ class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
         GFX.checkIsGFXThread()
         super.setZero()
         uploadFramebuffer()
+    }
+
+    override fun synchronize() {
+        super.synchronize()
+        synchronizeGraphics()
     }
 
     override fun supportsMesh() = false
@@ -90,6 +95,13 @@ class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
 
     companion object {
 
+        fun synchronizeGraphics() {
+            GFX.checkIsGFXThread()
+            GL11.glFlush()
+            GL11.glFinish() // wait for everything to be drawn
+            // should be enough for synchronization
+        }
+
         private fun createShader(x: Boolean): Shader {
             val shader = Shader(
                 "tsunami-gfx-sim-$x", null, ShaderLib.simplestVertexShader, ShaderLib.uvList, "" +
@@ -106,13 +118,13 @@ class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
                         "   vec4 data0 = texelFetch(state0, max(uv-deltaUV, ivec2(0)), lod);\n" +
                         "   vec4 data1 = texelFetch(state0, uv, lod);\n" +
                         "   vec4 data2 = texelFetch(state0, min(uv+deltaUV, maxUV), lod);\n" +
-                        "   vec2 update = timeScale * (${
-                            if (x) "solveZW(data0.xyw, data1.xyw) + solveXY(data1.xyw, data2.xyw)"
+                        "   vec2 update = timeScale * (${ // 2 flops for multiplication
+                            if (x) "solveZW(data0.xyw, data1.xyw) + solveXY(data1.xyw, data2.xyw)" // 2 flops for addition + 2 * 41 flops for call
                             else "  solveZW(data0.xzw, data1.xzw) + solveXY(data1.xzw, data2.xzw)"
                         });\n" +
-                        "   vec4 newData = data1 - vec4(update.x, ${if (x) "update.y, 0.0" else "0.0, update.y"}, 0.0);\n" +
+                        "   vec4 newData = data1 - vec4(update.x, ${if (x) "update.y, 0.0" else "0.0, update.y"}, 0.0);\n" + // 2 flops for addition
                         "   if(newData.x < 0) newData.x = 0;\n" +
-                        "   gl_FragColor = newData;\n" +
+                        "   gl_FragColor = newData;\n" + // total: 88 flops
                         "}"
             )
             shader.setTextureIndices(listOf("state0"))

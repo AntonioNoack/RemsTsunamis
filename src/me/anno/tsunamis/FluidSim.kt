@@ -14,6 +14,7 @@ import me.anno.engine.ui.render.RenderView
 import me.anno.gpu.GFX
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.texture.Texture2D
+import me.anno.image.colormap.LinearColorMap
 import me.anno.input.Input
 import me.anno.io.files.FileReference
 import me.anno.io.files.FileReference.Companion.getReference
@@ -22,19 +23,24 @@ import me.anno.io.serialization.SerializedProperty
 import me.anno.io.zip.InnerTmpFile
 import me.anno.maths.Maths.ceilDiv
 import me.anno.maths.Maths.clamp
+import me.anno.tsunamis.draw.Drawing
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.engine.TsunamiEngine
-import me.anno.tsunamis.draw.Drawing
 import me.anno.tsunamis.engine.gpu.ComputeEngine
 import me.anno.tsunamis.engine.gpu.GraphicsEngine
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFExport
 import me.anno.tsunamis.setups.FluidSimSetup
+import me.anno.ui.base.groups.PanelListY
+import me.anno.ui.base.text.TextPanel
 import me.anno.ui.editor.PropertyInspector
+import me.anno.ui.editor.SettingCategory
+import me.anno.ui.style.Style
 import me.anno.utils.ShutdownException
 import me.anno.utils.hpc.ProcessingGroup
 import me.anno.utils.hpc.ThreadLocal2
+import me.anno.utils.types.Lists.firstInstanceOrNull
 import org.apache.logging.log4j.LogManager
 import org.joml.*
 import kotlin.concurrent.thread
@@ -707,6 +713,41 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             return true
         } else lastMousePos.z = -1f // invalidate mouse position
         return false
+    }
+
+    /* only can be used for in-game stuff, so drawing would be a little complicated */
+    /*override fun onDrawGUI() {
+        super.onDrawGUI()
+        val instance = RenderView.currentInstance
+        renderPurely {
+            DrawRectangles.drawRect(
+                instance.x, instance.y,
+                instance.w / 2, instance.h / 2,
+                -1
+            )
+        }
+    }*/
+
+    override fun createInspector(
+        list: PanelListY,
+        style: Style,
+        getGroup: (title: String, description: String, dictSubPath: String) -> SettingCategory
+    ) {
+        super.createInspector(list, style, getGroup)
+        val title = list.findFirstInAll { it is TextPanel && it.text == "FluidSim" } as? TextPanel
+        if (title != null) {
+            val group = title.listOfHierarchyReversed.firstInstanceOrNull<PanelListY>()
+            if (group != null) {
+                var indexInList = 0
+                title.listOfPanelHierarchy {
+                    if (it.uiParent === group) {
+                        indexInList = it.indexInParent + 1
+                    }
+                }
+                group.add(indexInList, TextPanel("Color Map:", style))
+                group.add(indexInList + 1, ColorMapPreview(this, style))
+            } else LOGGER.warn("Group not found!")
+        } else LOGGER.warn("Title was not found!")
     }
 
     override fun clone() = FluidSim(this)

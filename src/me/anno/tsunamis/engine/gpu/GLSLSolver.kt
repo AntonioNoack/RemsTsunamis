@@ -23,65 +23,65 @@ object GLSLSolver {
             "   } else if(h.x <= 0.0){\n" +
             "       h.x  = h.y;\n" +
             "       b.x  = b.y;\n" +
-            "       hu.x = -hu.y;\n" +
+            "       hu.x = -hu.y;\n" + // a flop?
             "   } else if(h.y <= 0.0){\n" +
             "       h.y  = h.x;\n" +
             "       b.y  = b.x;\n" +
             "       hu.y = -hu.x;\n" +
             "   }\n" +
-            "   float roeHeight = (h.x+h.y)*0.5;\n" +
-            "   vec2 sqrt01 = sqrt(h);\n" +
+            "   float roeHeight = (h.x + h.y) * 0.5;\n" + // 2 flops
+            "   vec2 sqrt01 = sqrt(h);\n" + // 1 flop
             // "   vec2 u = vec2(h.x > 0.0 ? hu.x / h.x : 0.0, h.y > 0.0 ? hu.y / h.y : 0.0);\n" +
-            "   vec2 u = hu / h;\n" +
-            "   float roeVelocity = (u.x * sqrt01.x + u.y * sqrt01.y) / (sqrt01.x + sqrt01.y);\n" +
-            "   float gravityTerm = sqrt(gravity * roeHeight);\n" +
-            "   vec2 lambda = vec2(roeVelocity - gravityTerm, roeVelocity + gravityTerm);\n" +
-            "   float invLambda = 0.5 / gravityTerm;\n" +
-            "   float bathymetryTerm = gravity * roeHeight * (b.y - b.x);\n" +
-            "   float df0 = hu.y - hu.x;" +
-            "   float df1 = hu.y * u.y - hu.x * u.x" +
-            "                   + gravity * 0.5 * (h.y * h.y - h.x * h.x)" +
-            "                   + bathymetryTerm;\n" +
-            "   vec2 deltaH  = invLambda * vec2(df0 * lambda.y - df1, -df0 * lambda.x + df1);\n" +
-            "   vec2 deltaHu = deltaH * lambda;\n"
+            "   vec2 u = hu / h;\n" + // 1 flop
+            "   float roeVelocity = (u.x * sqrt01.x + u.y * sqrt01.y) / (sqrt01.x + sqrt01.y);\n" + // 5 flops
+            "   float gravityTerm = sqrt(gravity * roeHeight);\n" + // 2 flops
+            "   vec2 lambda = vec2(roeVelocity - gravityTerm, roeVelocity + gravityTerm);\n" + // 2 flops
+            "   float invLambda = 0.5 / gravityTerm;\n" + // 1 flop
+            "   float bathymetryTerm = gravity * roeHeight * (b.y - b.x);\n" + // 3 flops
+            "   float df0 = hu.y - hu.x;" + // 1 flop
+            "   float df1 = hu.y * u.y - hu.x * u.x" + // 3 flops
+            "                   + gravity * 0.5 * (h.y * h.y - h.x * h.x)" + // 6 flops
+            "                   + bathymetryTerm;\n" + // 1 flop
+            "   vec2 deltaH  = invLambda * vec2(df0 * lambda.y - df1, df1 - df0 * lambda.x);\n" + // 6 flops
+            "   vec2 deltaHu = deltaH * lambda;\n" // 2 flops, total: 39 flops
 
     const val fWaveSolverFull = "vec4 solve(vec3 data0, vec3 data1){\n" +
             fWaveSolverParams +
             "   if(h.x <= 0.0 && h.y <= 0.0) return vec4(0);\n" +
-            fWaveSolverBase +
+            fWaveSolverBase + // 39 flops
             "   vec4 dst = vec4(0.0);\n" +
             "   if(lambda.x < 0.0){\n" +
-            "       dst.x += deltaH.x;\n" +
-            "       dst.y += deltaHu.x;\n" +
+            "       dst.x  = deltaH.x;\n" +
+            "       dst.y  = deltaHu.x;\n" +
             "   } else {\n" +
-            "       dst.z += deltaH.x;\n" +
-            "       dst.w += deltaHu.x;\n" +
+            "       dst.z  = deltaH.x;\n" +
+            "       dst.w  = deltaHu.x;\n" +
             "   }\n" +
             "   if(lambda.y < 0.0){\n" +
-            "       dst.x += deltaH.y;\n" +
-            "       dst.y += deltaHu.y;\n" +
+            "       dst.x += deltaH.y;\n" + // 1 flop
+            "       dst.y += deltaHu.y;\n" + // 1 flop
             "   } else {\n" +
-            "       dst.z += deltaH.y;\n" +
-            "       dst.w += deltaHu.y;\n" +
+            "       dst.z += deltaH.y;\n" + // 1 flop
+            "       dst.w += deltaHu.y;\n" + // 1 flop
             "   }\n" +
             "   return dst;\n" +
-            "}\n"
+            "}\n" // total: 41 flops
 
     const val fWaveSolverHalf = "" +
             "vec2 solveXY(vec3 data0, vec3 data1){\n" +
             fWaveSolverParams +
             "   if(h.x <= 0.0 || h.y <= 0.0) return vec2(0);\n" +
-            fWaveSolverBase +
+            fWaveSolverBase + // 39 flops
             "   vec2 dst = vec2(0.0);\n" +
             "   if(lambda.x < 0.0){\n" +
             "       dst.x  = deltaH.x;\n" +
             "       dst.y  = deltaHu.x;\n" +
             "   }\n" +
             "   if(lambda.y < 0.0){\n" +
-            "       dst.x += deltaH.y;\n" +
-            "       dst.y += deltaHu.y;\n" +
+            "       dst.x += deltaH.y;\n" + // 1 flop
+            "       dst.y += deltaHu.y;\n" + // 1 flop
             "   }\n" +
-            "   return dst;\n" +
+            "   return dst;\n" + // total: 41 flops
             "}\n" +
             "vec2 solveZW(vec3 data0, vec3 data1){\n" +
             fWaveSolverParams +

@@ -39,10 +39,9 @@ Others:
 ### Basics
 *17.01.2022*
 
-todo [ ] fix scenario y flipped
-todo [ ] color scale thingy
+- todo AMD gpu debugger?
 
-- [ ] write graphics shaders
+- [x] write graphics shaders
 - [x] write compute shaders
 
 They probably will share the core components

@@ -9,7 +9,9 @@ import me.anno.utils.Clock
 import ucar.ma2.DataType
 import ucar.nc2.Variable
 import java.awt.image.BufferedImage
-import kotlin.math.*
+import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.min
 
 class VariableImage(variable: Variable) : Image(
     getWidth(variable),
@@ -48,6 +50,8 @@ class VariableImage(variable: Variable) : Image(
             }
         }
         c.stop("Min/Max")
+
+        flipTextureY(width, height, floats)
 
         this.min = min
         this.max = max
@@ -116,6 +120,21 @@ class VariableImage(variable: Variable) : Image(
         fun getHeight(variable: Variable): Int {
             val shape = variable.shape
             return if (shape.size < 2) 1 else shape[shape.size - 2]
+        }
+
+        fun flipTextureY(width: Int, height: Int, data: FloatArray) {
+            val hm1 = height - 1
+            for (y in 0 until height / 2) {
+                var srcIndex = y * width
+                var dstIndex = (hm1 - y) * width
+                for (x in 0 until width) {
+                    val tmp = data[srcIndex]
+                    data[srcIndex] = data[dstIndex]
+                    data[dstIndex] = tmp
+                    srcIndex++
+                    dstIndex++
+                }
+            }
         }
 
         fun clearNaNs(w: Int, h: Int, floats: FloatArray) {
