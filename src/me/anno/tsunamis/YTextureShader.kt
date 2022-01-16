@@ -34,6 +34,7 @@ object YTextureShader : ECSMeshShader("YTexture") {
         list.add(Variable(GLSLType.V4F, "heightMask"))
         list.add(Variable(GLSLType.V4F, "visualMask"))
         list.add(Variable(GLSLType.V1F, "fluidHeightScale"))
+        list.add(Variable(GLSLType.V2I, "coarseSize"))
         return list
     }
 
@@ -44,6 +45,9 @@ object YTextureShader : ECSMeshShader("YTexture") {
                 (if (colors) "#define COLORS\n" else "")
 
         glslVersion = 330
+
+        // done coarsening on gpu side: scale down image, or just use it as-is with strided access?
+        // (to do maybe) scaling down the image should help performance, when not every frame is rendered, or shadows are needed
 
         return ShaderStage(
             "vertex",
@@ -59,27 +63,35 @@ object YTextureShader : ECSMeshShader("YTexture") {
                     "#define getColor11(v) v < 0.0 ? " +
                     "   mix(vec3(0.0,0.33,1.0), vec3(1.0), clamp(v+1.0, 0.0, 1.0)) : " +
                     "   mix(vec3(1.0), vec3(1.0,0.0,0.0), clamp(v, 0.0, 1.0))\n" +
+                    "#define COARSE_INDEX_TO_FINE0(x,w,cw) x < 2 || cw <= 4 ? x : cw - x <= 2 ? x + w - cw : 2 + (x-2)*(w-4)/(cw-4)\n" +
+                    "#define COARSE_INDEX_TO_FINE1(x,w,cw) x < 1 || cw <= 2 ? x : cw - x <= 1 ? x + w - cw : 1 + (x-1)*(w-2)/(cw-2)\n" +
                     "ivec2 fieldSize = textureSize(TEXTURE, lod);\n" +
-                    "int cellIndex  = gl_VertexID / 6;\n" +
-                    "int partOfCell = gl_VertexID % 6;\n" +
+                    "int instanceId = int(gl_InstanceID);\n" +
+                    "int cellIndex  = instanceId >> 1;\n" +
+                    "int partOfCell = gl_VertexID + (instanceId & 1) * 3;\n" +
                     "int deltaX[6] = { 0, 1, 1, 1, 0, 0 };\n" +
                     "int deltaY[6] = { 0, 0, 1, 1, 0, 1 };\n" +
-                    "int numCellsX = max(1, fieldSize.x - 1);\n" +
-                    "int numCellsY = max(1, fieldSize.y - 1);\n" +
+                    "int numCellsX = max(1, coarseSize.x - 1);\n" +
+                    "int numCellsY = max(1, coarseSize.y - 1);\n" +
                     "ivec2 numCells = ivec2(numCellsX, numCellsY);\n" +
                     "int cellX = cellIndex % numCellsX + deltaX[partOfCell];\n" +
                     "int cellY = cellIndex / numCellsX + deltaY[partOfCell];\n" +
+                    "ivec2 fieldSizeM1 = fieldSize - 1;\n" +
+                    "if(coarseSize.x > 0 && coarseSize.x != fieldSize.x){\n" +
+                    "   cellX = COARSE_INDEX_TO_FINE1(cellX, fieldSize.x, coarseSize.x);\n" +
+                    "   cellY = COARSE_INDEX_TO_FINE1(cellY, fieldSize.y, coarseSize.y);\n" +
+                    "}\n" +
                     "ivec2 cell = ivec2(cellX, cellY);\n" +
                     "vec2 invFieldSize = 1.0 / vec2(fieldSize-1);\n" +
                     "vec2 uv = vec2(cellX, cellY) * invFieldSize;\n" + // [0,1]
-                    "vec4 data = texelFetch(TEXTURE, clamp(cell, ivec2(0), numCells), lod);\n" +
+                    "vec4 data = texelFetch(TEXTURE, clamp(cell, ivec2(0), fieldSizeM1), lod);\n" +
                     "localPosition = vec3(float(cellX) * cellSize, SURFACE2(data), float(cellY) * cellSize) + cellOffset;\n" +
                     "#ifdef COLORS\n" +
                     // calculate the normals
-                    "   vec4 dxp = texelFetch(TEXTURE, clamp(cell + ivec2(1, 0), ivec2(0), numCells), lod);\n" +
-                    "   vec4 dxm = texelFetch(TEXTURE, clamp(cell - ivec2(1, 0), ivec2(0), numCells), lod);\n" +
-                    "   vec4 dyp = texelFetch(TEXTURE, clamp(cell + ivec2(0, 1), ivec2(0), numCells), lod);\n" +
-                    "   vec4 dym = texelFetch(TEXTURE, clamp(cell - ivec2(0, 1), ivec2(0), numCells), lod);\n" +
+                    "   vec4 dxp = texelFetch(TEXTURE, clamp(cell + ivec2(1, 0), ivec2(0), fieldSizeM1), lod);\n" +
+                    "   vec4 dxm = texelFetch(TEXTURE, clamp(cell - ivec2(1, 0), ivec2(0), fieldSizeM1), lod);\n" +
+                    "   vec4 dyp = texelFetch(TEXTURE, clamp(cell + ivec2(0, 1), ivec2(0), fieldSizeM1), lod);\n" +
+                    "   vec4 dym = texelFetch(TEXTURE, clamp(cell - ivec2(0, 1), ivec2(0), fieldSizeM1), lod);\n" +
                     "   vec3 normals = normalize(vec3(\n" +
                     "       SURFACE2(dxp) - SURFACE2(dxm),\n" +
                     "       cellSize * 2.0,\n" +
@@ -110,7 +122,10 @@ object YTextureShader : ECSMeshShader("YTexture") {
                     "#ifdef COLORS\n" +
                     "   normal = normalize(normal);\n" +
                     "   float v = 0;\n" +
-                    "   vertexColor = vec4(texture(colorMap, vec2(data.a * colorMapScale.x + colorMapScale.y, 0.0)).rgb, 1.0);\n" +
+                    "   float cm = clamp(data.a * colorMapScale.x + colorMapScale.y, 0.0, 1.0);\n" +
+                    "   int cmSize = textureSize(colorMap, 0).x;\n" +
+                    "   vec4 texel = texelFetch(colorMap, ivec2(min(int(float(cmSize) * cm), cmSize-1), 0), 0);\n" +
+                    "   vertexColor = vec4(texel.rgb, 1.0);\n" +
                     "   if(data.a < 0.0 && visualization != ${Visualisation.HEIGHT_MAP.id}){\n" +
                     "       switch(visualization){\n" +
                     "       case ${Visualisation.MOMENTUM.id}:\n" +

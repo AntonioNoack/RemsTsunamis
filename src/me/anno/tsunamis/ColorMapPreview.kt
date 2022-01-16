@@ -46,8 +46,8 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
         // border in black
         drawRect(xs - 1, ys - 1, stripeW + 2, ye - ys + 2, black)
         if (colorMap != null) {
-            maxValue = colorMap.max
-            minValue = colorMap.min
+            maxValue = colorMap.max * sim.colorMapScale
+            minValue = colorMap.min * sim.colorMapScale
             for (y in max(y0, ys) until min(y1, ye)) {
                 val v = (y - ys).toFloat() / (ye - ys).toFloat()
                 val color = colorMap.getColor(mix(colorMap.max, colorMap.min, v))

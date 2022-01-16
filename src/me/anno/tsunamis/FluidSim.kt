@@ -13,8 +13,8 @@ import me.anno.engine.raycast.Raycast
 import me.anno.engine.ui.render.RenderView
 import me.anno.gpu.GFX
 import me.anno.gpu.shader.GLSLType
+import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.Texture2D
-import me.anno.image.colormap.LinearColorMap
 import me.anno.input.Input
 import me.anno.io.files.FileReference
 import me.anno.io.files.FileReference.Companion.getReference
@@ -83,6 +83,17 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @Group("Visuals")
     @SerializedProperty
     var colorMap: FileReference = defaultColorMap
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateFluid()
+                invalidateBathymetryMesh()
+            }
+        }
+
+    @Group("Visuals")
+    @SerializedProperty
+    var colorMapScale = 1f
         set(value) {
             if (field != value) {
                 field = value
@@ -265,6 +276,12 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     @SerializedProperty
     var fluidHeightScale = 1f
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateFluid()
+            }
+        }
 
     fun getIndex(x: Int, y: Int): Int {
         val width = width
@@ -311,7 +328,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         }
 
     @DebugAction
-    fun setSizeBySetup() {
+    fun setDimensionsBySetup() {
         val setup = setup
         if (setup != null) {
             if (setup.isReady()) {
@@ -369,8 +386,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     override fun onUpdate(): Int {
         if (ensureFieldSize()) {
             val bm = bathymetryMesh
-            if (!hasValidBathymetryMesh && bm != null)
+            if (!hasValidBathymetryMesh && bm != null) {
                 generateBathymetryMesh(bm)
+            }
             if (!isPaused) {
                 val engine = engine!!
                 val dt = GFX.deltaTime * timeFactor
@@ -430,6 +448,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @SerializedProperty
     var useTextureData: Boolean = true
 
+    @NotSerializedProperty
+    val useTextureData2: Boolean
+        get() = engine?.run { (useTextureData && supportsTexture()) || !supportsMesh() } ?: useTextureData
+
     private fun findVisualScale() {
         maxVisualizedValueInternally = if (maxVisualizedValue == 0f) {
             when (visualization) {
@@ -453,17 +475,24 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         material["fluidData"] = TypeValue(GLSLType.S2D, fluidTexture)
         if (colorMap != null) {
             colorMap.createTexture(colorMapTexture, false)
+            colorMapTexture.clamping = Clamping.CLAMP
             material["colorMap"] = TypeValue(GLSLType.S2D, colorMapTexture)
-            val delta = (colorMap.max - colorMap.min)
-            val scale2 = Vector2f(1f / delta, colorMap.min / delta)
+            val newMax = colorMap.max * colorMapScale
+            val newMin = colorMap.min * colorMapScale
+            val delta = (newMax - newMin)
+            val scale2 = Vector2f(1f / delta, -newMin / delta)
             material["colorMapScale"] = TypeValue(GLSLType.V2F, scale2)
         }
-        material["cellSize"] = TypeValue(GLSLType.V1F, cellSize)
+        if (engineType == EngineType.CPU) {
+            material["cellSize"] = TypeValue(GLSLType.V1F, cellSize)
+        } else {
+            material["cellSize"] = TypeValue(GLSLType.V1F, cellSizeMeters)
+        }
+        // intended to solve z-fighting; doesn't work that well
+        // when culling is enabled, this won't be a problem anyways
+        val dz = if (flipBathymetryNormal) cellSize / 100f else 0f
         val cellOffset = Vector3f(
-            -(cw - 2) * 0.5f * cellSize,
-            // intended to solve z-fighting; doesn't work that well
-            // when culling is enabled, this won't be a problem anyways
-            if (flipBathymetryNormal) cellSize / 100f else 0f,
+            -(cw - 2) * 0.5f * cellSize, dz,
             -(ch - 2) * 0.5f * cellSize
         )
         material["cellOffset"] = TypeValue(GLSLType.V3F, cellOffset)
@@ -480,30 +509,21 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         )
         material["heightMask"] = TypeValue(GLSLType.V4F, Vector4f(1f, 0f, 0f, 1f))
         material["fluidHeightScale"] = TypeValue(GLSLType.V1F, fluidHeightScale)
+        material["coarseSize"] = TypeValue(GLSLType.V2I, Vector2i(cw - 2, ch - 2))
     }
 
     private fun ensureTriangleCount(mesh: ProceduralMesh, cw: Int, ch: Int) {
         val mesh2 = mesh.mesh2
-        val targetSize = (cw - 3) * (ch - 3) * 3 * 6
-        // todo we should set the bounding box positions, so it is clickable
-        val needsUpdate = when {
-            mesh2.positions?.size != targetSize -> {
-                mesh2.positions = FloatArray(targetSize)
-                mesh2.normals = mesh2.positions // don't care about the values
-                mesh2.indices = null
-                true
-            }
-            mesh2.indices != null -> {
-                mesh2.indices = null
-                true
-            }
-            else -> false
-        }
-        if (needsUpdate) {
-            mesh2.color0 = null
+        val targetSize = (cw - 3) * (ch - 3) * 2
+        if (mesh2.proceduralLength != targetSize) {
+            mesh2.proceduralLength = targetSize
+            mesh2.positions = f12
+            mesh2.normals = f0
+            mesh2.color0 = i0
             invalidateMesh()
-            ensureBuffer()
         }
+        // todo it would be cool if we had a rough mesh on the cpu, and a fine one on the gpu
+        // todo we should set the bounding box positions, so it is clickable
     }
 
     private fun generateFluidMesh(mesh: ProceduralMesh) {
@@ -517,8 +537,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val ch = ceilDiv(h, scale)
         findVisualScale()
         val cellSize = getCellSize(cellSizeMeters, w, cw)
-        val useTexture = (useTextureData && engine.supportsTexture()) || !engine.supportsMesh()
-        if (useTexture) {
+        if (useTextureData2) {
             mesh.materials = fluidMaterialList
             val material = MaterialCache[fluidMaterialList[0]]
             if (material != null) {
@@ -527,9 +546,11 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             }
             ensureTriangleCount(mesh, cw, ch)
         } else {
+            mesh.materials = emptyList()
+            mesh.mesh2.proceduralLength = 0
             engine.createFluidMesh(
-                w, h, cw, ch, cellSize, scale,
-                visualization, colorMap, maxVisualizedValueInternally, mesh
+                w, h, cw, ch, cellSize, scale, fluidHeightScale,
+                visualization, colorMap, colorMapScale, maxVisualizedValueInternally, mesh
             )
         }
     }
@@ -548,7 +569,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val cw = ceilDiv(w, scale)
         val ch = ceilDiv(h, scale)
         val cellSize = getCellSize(cellSizeMeters, w, cw)
-        engine!!.createBathymetryMesh(w, h, cw, ch, scale, cellSize, colorMap, flipBathymetryNormal, mesh)
+        engine!!.createBathymetryMesh(
+            w, h, cw, ch, scale, cellSize,
+            colorMap, colorMapScale, flipBathymetryNormal, mesh
+        )
     }
 
     fun step(dt: Float, numMaxIterations: Int = 10): Float {
@@ -576,8 +600,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         return done
     }
 
+    @SerializedProperty
+    var synchronize = false
+
     fun computeStep(scaling: Float) {
-        engine!!.step(gravity, scaling)
+        val engine = engine ?: return
+        engine.step(gravity, scaling)
+        if (synchronize) engine.synchronize()
     }
 
     fun setGhostOutflow(width: Int, height: Int, v: FloatArray) {
@@ -660,19 +689,17 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         engine?.destroy()
         engine = null
         invalidateFluid()
+        invalidateBathymetryMesh()
     }
 
     fun invalidateFluid() {
         if (computeOnly) return
         if (GFX.isGFXThread()) {
-            if (useTextureData) {
-                // easy <3
+            if (useTextureData2) {
                 generateFluidMesh(this)
-            } else {
-                invalidateMesh()
-                // why is this not called automatically?
-                ensureBuffer()
             }
+            invalidateMesh()
+            ensureBuffer()
         } else {
             GFX.addGPUTask(1) {
                 invalidateFluid()
@@ -734,14 +761,14 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         getGroup: (title: String, description: String, dictSubPath: String) -> SettingCategory
     ) {
         super.createInspector(list, style, getGroup)
-        val title = list.findFirstInAll { it is TextPanel && it.text == "FluidSim" } as? TextPanel
+        val title = list.findFirstInAll { it is TextPanel && it.text == "Color Map Scale" } as? TextPanel
         if (title != null) {
             val group = title.listOfHierarchyReversed.firstInstanceOrNull<PanelListY>()
             if (group != null) {
                 var indexInList = 0
                 title.listOfPanelHierarchy {
                     if (it.uiParent === group) {
-                        indexInList = it.indexInParent + 1
+                        indexInList = it.indexInParent
                     }
                 }
                 group.add(indexInList, TextPanel("Color Map:", style))
@@ -797,6 +824,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     companion object {
 
+        // todo check coast-condition for errors
+
         /**
          * scales down an index from a coarse grid to a fine grid, preserves the border
          * */
@@ -833,6 +862,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         private val defaultColorMap = getReference("res://colormaps/globe.xml")
         private val LOGGER = LogManager.getLogger(FluidSim::class)
         val f0 = FloatArray(0)
+        val i0 = IntArray(0)
+        val f12 = FloatArray(12)
     }
 
 }

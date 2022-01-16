@@ -65,8 +65,10 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     open fun createFluidMesh(
         w: Int, h: Int, cw: Int, ch: Int, cellSize: Float, scale: Int,
+        fluidHeightScale: Float,
         visualisation: Visualisation,
-        colorMap: ColorMap?, maxVisualizedValueInternally: Float,
+        colorMap: ColorMap?, colorMapScale: Float,
+        maxVisualizedValueInternally: Float,
         mesh: ProceduralMesh
     ) {
         throw RuntimeException("Operation not supported")
@@ -80,10 +82,12 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     fun createBathymetryMesh(
         w: Int, h: Int, cw: Int, ch: Int, scale: Int, cellSize: Float,
-        colorMap: ColorMap?, flipBathymetryNormal: Boolean, mesh: ProceduralMesh
+        colorMap: ColorMap?, colorMapScale: Float,
+        flipBathymetryNormal: Boolean, mesh: ProceduralMesh
     ) {
         val bathymetry = bathymetry
         val normalY = cellSize * 2f * (if (flipBathymetryNormal) -1f else +1f)
+        val invCMScale = 1f / colorMapScale
         TerrainUtils.generateRegularQuadHeightMesh(
             cw - 2, ch - 2, 1 + cw, cw,
             flipBathymetryNormal,
@@ -112,7 +116,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             } else object : TerrainUtils.ColorMap {
                 override fun get(it: Int): Int {
                     val i = coarseIndexToFine(w, h, cw, ch, it)
-                    return colorMap.getColor(bathymetry[i])
+                    return colorMap.getColor(bathymetry[i] * invCMScale)
                 }
             }
         )
@@ -170,9 +174,21 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
         }
 
         fun createFluidMesh(
-            w: Int, h: Int, cw: Int, ch: Int, cellSize: Float, scale: Int,
-            fluidHeight: FloatArray, fluidMomentumX: FloatArray, fluidMomentumY: FloatArray, bathymetry: FloatArray,
-            visualisation: Visualisation, colorMap: ColorMap?, maxVisualizedValueInternally: Float,
+            w: Int,
+            h: Int,
+            cw: Int,
+            ch: Int,
+            cellSize: Float,
+            scale: Int,
+            fluidHeightScale: Float,
+            fluidHeight: FloatArray,
+            fluidMomentumX: FloatArray,
+            fluidMomentumY: FloatArray,
+            bathymetry: FloatArray,
+            visualisation: Visualisation,
+            colorMap: ColorMap?,
+            colorMapScale: Float,
+            maxVisualizedValueInternally: Float,
             mesh: ProceduralMesh,
         ) {
             val size = w * h
@@ -180,6 +196,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             fluidMomentumX[size - 1]
             fluidMomentumY[size - 1]
             bathymetry[size - 1]
+            val invCMScale = 1f / colorMapScale
             val getColor: TerrainUtils.ColorMap = when (visualisation) {
                 Visualisation.HEIGHT_MAP -> {
                     if (colorMap == null) object : TerrainUtils.ColorMap {
@@ -189,8 +206,8 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                             val i = coarseIndexToFine(w, h, cw, ch, it)
                             val fh = fluidHeight[i]
                             return if (fh > 0f) {// under water, surface color
-                                colorMap.getColor(-fh)
-                            } else colorMap.getColor(bathymetry[i]) // land color
+                                colorMap.getColor(-fh * invCMScale)
+                            } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
                         }
                     }
                 }
@@ -207,7 +224,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                             val fh = fluidHeight[i]
                             return if (fh > 0f) {// under water, surface color
                                 getColor11(fluidMomentumX[i] * momentumScale)
-                            } else colorMap.getColor(bathymetry[i]) // land color
+                            } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
                         }
                     }
                 }
@@ -224,7 +241,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                             val fh = fluidHeight[i]
                             return if (fh > 0f) {// under water, surface color
                                 getColor11(fluidMomentumY[i] * momentumScale)
-                            } else colorMap.getColor(bathymetry[i]) // land color
+                            } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
                         }
                     }
                 }
@@ -241,7 +258,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                             val fh = fluidHeight[i]
                             return if (fh > 0f) {// under water, surface color
                                 getColor11(Maths.length(fluidMomentumX[i], fluidMomentumY[i]) * momentumScale)
-                            } else colorMap.getColor(bathymetry[i]) // land color
+                            } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
                         }
                     }
                 }
@@ -259,7 +276,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                             val ba = bathymetry[i]
                             return if (fh > 0f) {// under water, surface color
                                 getColor11((fh + ba) * heightScale)
-                            } else colorMap.getColor(ba) // land color
+                            } else colorMap.getColor(ba * invCMScale) // land color
                         }
                     }
                 }
@@ -267,15 +284,19 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             mesh.materials = emptyList()
             fun getSurfaceHeightAt(x: Int, y: Int): Float {
                 val index = getIndex(x, y, w - 2, h - 2)
-                return fluidHeight[index] + bathymetry[index]
+                val fh = fluidHeight[index]
+                val surface = fh + bathymetry[index]
+                return if (fh > 0f) surface * fluidHeightScale else surface
             }
             TerrainUtils.generateRegularQuadHeightMesh(
                 cw - 2, ch - 2, cw + 1, cw,
                 false, cellSize, mesh.mesh2,
                 object : TerrainUtils.HeightMap {
                     override fun get(it: Int): Float {
-                        val i = coarseIndexToFine(w, h, cw, ch, it)
-                        return fluidHeight[i] + bathymetry[i]
+                        val index = coarseIndexToFine(w, h, cw, ch, it)
+                        val fh = fluidHeight[index]
+                        val surface = fh + bathymetry[index]
+                        return if (fh > 0f) surface * fluidHeightScale else surface
                     }
                 },
                 object : TerrainUtils.NormalMap {

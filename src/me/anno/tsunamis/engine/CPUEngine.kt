@@ -197,15 +197,16 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         w: Int, h: Int,
         cw: Int, ch: Int,
         cellSize: Float, scale: Int,
+        fluidHeightScale: Float,
         visualisation: Visualisation,
-        colorMap: ColorMap?,
+        colorMap: ColorMap?, colorMapScale: Float,
         maxVisualizedValueInternally: Float,
         mesh: ProceduralMesh
     ) {
         createFluidMesh(
-            w, h, cw, ch, cellSize, scale,
+            w, h, cw, ch, cellSize, scale, fluidHeightScale,
             fluidHeight, fluidMomentumX, fluidMomentumY, bathymetry,
-            visualisation, colorMap, maxVisualizedValueInternally, mesh
+            visualisation, colorMap, colorMapScale, maxVisualizedValueInternally, mesh
         )
     }
 

@@ -63,6 +63,10 @@ class ComputeEngine(width: Int, height: Int) : CPUEngine(width, height) {
 
     override fun updateStatistics(sim: FluidSim) {
         // leave them be
+        /*val reduced = Reduction.reduce(src, Reduction.MAX_RA)
+        sim.maxSurfaceHeight = reduced.x
+        sim.maxMomentumX = reduced.x
+        sim.maxMomentumY = reduced.y*/
     }
 
     override fun getFluidHeightAt(x: Int, y: Int): Float {
