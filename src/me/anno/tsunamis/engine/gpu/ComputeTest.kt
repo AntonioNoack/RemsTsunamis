@@ -165,7 +165,7 @@ object ComputeTest {
             useFrame(srcFB) {
                 val shader = showWavesShader.value
                 shader.use()
-                shader.v3("scale", 1f / maxFluidHeight, 1f / maxMomentum, 1f / maxMomentum)
+                shader.v3f("scale", 1f / maxFluidHeight, 1f / maxMomentum, 1f / maxMomentum)
                 src.bind(0)
                 GFX.flat01.draw(shader)
             }

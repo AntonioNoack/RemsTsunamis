@@ -19,8 +19,8 @@ import org.lwjgl.opengl.GL20
 
 class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
 
-    private val src = Framebuffer("tsunami-gfx", width, height, 1, 1, true, DepthBufferType.NONE)
-    private val tmp = Framebuffer("tsunami-gfx-tmp", width, height, 1, 1, true, DepthBufferType.NONE)
+    val src = Framebuffer("tsunami-gfx", width, height, 1, 1, true, DepthBufferType.NONE)
+    val tmp = Framebuffer("tsunami-gfx-tmp", width, height, 1, 1, true, DepthBufferType.NONE)
     private var maxVelocity = 0f
 
     override fun init(sim: FluidSim, setup: FluidSimSetup, gravity: Float) {
@@ -136,8 +136,8 @@ class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
         private fun step(shader: Shader, src: Framebuffer, dst: Framebuffer, gravity: Float, timeScale: Float) {
             useFrame(dst, Renderer.copyRenderer) {
                 shader.use()
-                shader.v1("gravity", gravity)
-                shader.v1("timeScale", timeScale)
+                shader.v1f("gravity", gravity)
+                shader.v1f("timeScale", timeScale)
                 GL20.glUniform2i(shader.getUniformLocation("maxUV"), src.w - 1, src.h - 1)
                 src.bindTexture0(0, GPUFiltering.TRULY_NEAREST, Clamping.CLAMP)
                 GFX.flat01.draw(shader)

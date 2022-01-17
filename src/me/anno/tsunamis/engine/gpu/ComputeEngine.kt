@@ -5,45 +5,29 @@ import me.anno.gpu.OpenGL.renderPurely
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
 import me.anno.gpu.texture.Texture2D
-import me.anno.tsunamis.FluidSim
-import me.anno.tsunamis.engine.CPUEngine
-import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.engine.gpu.GraphicsEngine.Companion.synchronizeGraphics
-import me.anno.tsunamis.setups.FluidSimSetup
 import org.joml.Vector2i
-import org.lwjgl.opengl.GL20.glUniform2i
 import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
 import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
-class ComputeEngine(width: Int, height: Int) : CPUEngine(width, height) {
+class ComputeEngine(width: Int, height: Int) :
+    GPUEngine<Texture2D>(width, height, { Texture2D(it, width, height, 1) }) {
 
-    private val src = Texture2D("src", width, height, 1)
-    private val tmp = Texture2D("tmp", width, height, 1)
-    private var maxVelocity = 0f
-
-    override fun init(sim: FluidSim, setup: FluidSimSetup, gravity: Float) {
-        GFX.checkIsGFXThread()
-        super.init(sim, setup, gravity)
-        maxVelocity = super.computeMaxVelocity(gravity)
-        super.updateStatistics(sim)
-        uploadFramebuffer()
-        tmp.createFP32()
+    override fun createBuffer(buffer: Texture2D) {
+        buffer.createFP32()
     }
 
-    private fun uploadFramebuffer() {
-        val data = createTextureData(width, height, this)
-        src.createRGBA(data, false)
+    override fun createBuffer(buffer: Texture2D, data: FloatArray) {
+        buffer.createRGBA(data, false)
+    }
+
+    override fun destroyBuffer(buffer: Texture2D) {
+        buffer.destroy()
     }
 
     override fun step(gravity: Float, scaling: Float) {
         GFX.checkIsGFXThread()
         step(gravity, scaling, src, tmp)
-    }
-
-    override fun setZero() {
-        GFX.checkIsGFXThread()
-        super.setZero()
-        uploadFramebuffer()
     }
 
     override fun synchronize() {
@@ -53,46 +37,7 @@ class ComputeEngine(width: Int, height: Int) : CPUEngine(width, height) {
         synchronizeGraphics()
     }
 
-    override fun supportsAsyncCompute() = false
-
-    override fun supportsMesh() = false
-
-    override fun supportsTexture() = true
-
     override fun createFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src
-
-    override fun updateStatistics(sim: FluidSim) {
-        // leave them be
-        /*val reduced = Reduction.reduce(src, Reduction.MAX_RA)
-        sim.maxSurfaceHeight = reduced.x
-        sim.maxMomentumX = reduced.x
-        sim.maxMomentumY = reduced.y*/
-    }
-
-    override fun getFluidHeightAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
-
-    override fun getMomentumXAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
-
-    override fun getMomentumYAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
-
-    override fun computeMaxVelocity(gravity: Float): Float {
-        return maxVelocity
-    }
-
-    override fun destroy() {
-        super.destroy()
-        src.destroy()
-        tmp.destroy()
-    }
 
     companion object {
 
@@ -133,9 +78,9 @@ class ComputeEngine(width: Int, height: Int) : CPUEngine(width, height) {
 
         private fun step(shader: ComputeShader, gravity: Float, timeScale: Float, src: Texture2D, dst: Texture2D) {
             shader.use()
-            glUniform2i(shader.getUniformLocation("maxUV"), src.w - 1, src.h - 1)
-            shader.v1("timeScale", timeScale)
-            shader.v1("gravity", gravity)
+            shader.v1f("timeScale", timeScale)
+            shader.v1f("gravity", gravity)
+            shader.v2i("maxUV", src.w - 1, src.h - 1)
             ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
             ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
             shader.runBySize(src.w, src.h)

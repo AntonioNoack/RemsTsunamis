@@ -72,6 +72,19 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @NotSerializedProperty
     var engine: TsunamiEngine? = null
 
+    @NotSerializedProperty
+    var maxVisualizedValueInternally = 0f
+
+    @Group("Visuals")
+    @SerializedProperty
+    var maxVisualizedValue = 0f
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateFluid()
+            }
+        }
+
     @Group("Visuals")
     @Type("ManualProceduralMesh/PrefabSaveable")
     @SerializedProperty
@@ -166,18 +179,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @DebugProperty
     @NotSerializedProperty
     var maxTimeStep = 0f
-
-    @NotSerializedProperty
-    var maxVisualizedValueInternally = 0f
-
-    @SerializedProperty
-    var maxVisualizedValue = 0f
-        set(value) {
-            if (field != value) {
-                field = value
-                invalidateFluid()
-            }
-        }
 
     @Group("Time")
     @Docs("Gravity in m/s²")

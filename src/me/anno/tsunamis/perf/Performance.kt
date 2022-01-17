@@ -34,7 +34,7 @@ import kotlin.math.roundToInt
 [19:02:51,INFO:Performance] GPU_COMPUTE, 412 iterations
 [19:03:01,INFO:Performance] 9.887 s, 475.2597631461869 GFlop/s (48.85x, 1.01x), 345.64346410631777 GB/s
 
-Theoretical CPU performance: 6 cores * 3.4GHz base clock = 20.4 GFlops (FMA currently ignored, because that can be only used sometimes)
+Theoretical CPU performance: 6 cores * 3.4GHz base clock * 4 (avx256) = 81.6 GFlops (FMA currently ignored, because that can be only used sometimes)
                         DDR4 3200: 25.6 GB/s (but it should be dual channel, so x2?)
 Theoretical GPU performance: 6.2 TFlops, 256 GB/s
 
