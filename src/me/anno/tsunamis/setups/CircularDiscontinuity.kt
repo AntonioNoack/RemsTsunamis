@@ -52,7 +52,7 @@ class CircularDiscontinuity : FluidSimSetup {
     }
 
     override fun fillBathymetry(w: Int, h: Int, dst: FloatArray) {
-        dst.fill(0f)
+        dst.fill(-heightOuter)
     }
 
     override fun clone() = CircularDiscontinuity(this)

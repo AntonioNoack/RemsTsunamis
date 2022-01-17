@@ -4,11 +4,11 @@ import me.anno.ecs.components.mesh.ProceduralMesh
 import me.anno.gpu.texture.Texture2D
 import me.anno.io.serialization.NotSerializedProperty
 import me.anno.tsunamis.FluidSim
-import me.anno.tsunamis.FluidSim.Companion.coarseIndexToFine
 import me.anno.tsunamis.Visualisation
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
+import me.anno.utils.hpc.HeavyProcessing.processBalanced
 import kotlin.math.max
 import kotlin.math.min
 
@@ -92,6 +92,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         setGhostOutflow(width, height, h0)
         setGhostOutflow(width, height, hu0)
 
+        // todo copy in parallel
         val h1 = copy(h0, tmpH)
         val hu1 = copy(hu0, tmpHuX)
 
@@ -224,10 +225,16 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
     }
 
     companion object {
+
         fun copy(src: FloatArray, dst: FloatArray = FloatArray(src.size)): FloatArray {
-            System.arraycopy(src, 0, dst, 0, src.size)
+            if (src.size * 4 >= 1_000_000) {
+                processBalanced(0, src.size, false) { i0, i1 ->
+                    System.arraycopy(src, i0, dst, i0, i1 - i0)
+                }
+            }
             return dst
         }
+
     }
 
 }

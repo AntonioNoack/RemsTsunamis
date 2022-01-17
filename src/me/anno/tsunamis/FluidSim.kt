@@ -511,7 +511,22 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         material["heightMask"] = TypeValue(GLSLType.V4F, Vector4f(1f, 0f, 0f, 1f))
         material["fluidHeightScale"] = TypeValue(GLSLType.V1F, fluidHeightScale)
         material["coarseSize"] = TypeValue(GLSLType.V2I, Vector2i(cw - 2, ch - 2))
+        material["nearestNeighborColors"] = TypeValue(GLSLType.BOOL, nearestNeighborColors)
     }
+
+    // todo separate color map for bathymetry & fluid
+
+    // todo nearest neighbor colors for bathymetry & meshes in general (?)
+    @Group("Visuals")
+    @SerializedProperty
+    var nearestNeighborColors = false
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateFluid()
+                // invalidateBathymetryMesh()
+            }
+        }
 
     private fun ensureTriangleCount(mesh: ProceduralMesh, cw: Int, ch: Int) {
         val mesh2 = mesh.mesh2

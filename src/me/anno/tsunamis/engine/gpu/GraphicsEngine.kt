@@ -7,7 +7,6 @@ import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
 import me.anno.gpu.shader.Renderer
 import me.anno.gpu.shader.Shader
-import me.anno.gpu.shader.ShaderLib
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.GPUFiltering
 import me.anno.tsunamis.FluidSim
@@ -104,13 +103,18 @@ class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
 
         private fun createShader(x: Boolean): Shader {
             val shader = Shader(
-                "tsunami-gfx-sim-$x", null, ShaderLib.simplestVertexShader, ShaderLib.uvList, "" +
+                if (x) "gfxTimeStep(x)" else "gfxTimeStep(y)",
+                null, "" +
+                        "attribute vec2 attr0;\n" +
+                        "void main(){ gl_Position = vec4(attr0*2.0-1.0,0.5,1.0); }",
+                emptyList(), "" +
                         "uniform sampler2D state0;\n" +
                         "uniform ivec2 maxUV;\n" +
                         "uniform float timeScale;\n" +
                         "uniform float gravity;\n" +
                         GLSLSolver.fWaveSolverFull +
                         GLSLSolver.fWaveSolverHalf +
+                        // "(layout = 0) out vec4 gl_FragColor;\n" +
                         "void main(){\n" +
                         "   int lod = 0;\n" +
                         "   ivec2 uv = ivec2(gl_FragCoord.xy);\n" +
