@@ -11,7 +11,7 @@ import org.joml.Vector2i
 import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
 import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
-class ComputeEngine(width: Int, height: Int) :
+open class ComputeEngine(width: Int, height: Int) :
     GPUEngine<Texture2D>(width, height, {
         val tex = Texture2D(it, width, height, 1)
         tex.autoUpdateMipmaps = false

@@ -12,25 +12,7 @@ import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
 import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
 class ComputeYXEngine(width: Int, height: Int) :
-    GPUEngine<Texture2D>(width, height, {
-        val tex = Texture2D(it, width, height, 1)
-        tex.autoUpdateMipmaps = false
-        tex.filtering = GPUFiltering.TRULY_NEAREST
-        tex.clamping = Clamping.CLAMP
-        tex
-    }) {
-
-    override fun createBuffer(buffer: Texture2D) {
-        buffer.createFP32()
-    }
-
-    override fun createBuffer(buffer: Texture2D, data: FloatArray) {
-        buffer.createRGBA(data, false)
-    }
-
-    override fun destroyBuffer(buffer: Texture2D) {
-        buffer.destroy()
-    }
+    ComputeEngine(width, height) {
 
     override fun step(gravity: Float, scaling: Float) {
         GFX.checkIsGFXThread()
@@ -46,15 +28,6 @@ class ComputeYXEngine(width: Int, height: Int) :
             step(shaders.second, gravity, scaling, tmp, src)
         }
     }
-
-    override fun synchronize() {
-        super.synchronize()
-        GFX.checkIsGFXThread()
-        glMemoryBarrier(GL_ALL_BARRIER_BITS)
-        synchronizeGraphics()
-    }
-
-    override fun createFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src
 
     companion object {
 
