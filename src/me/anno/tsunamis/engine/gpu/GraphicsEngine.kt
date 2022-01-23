@@ -5,37 +5,37 @@ import me.anno.gpu.OpenGL.renderPurely
 import me.anno.gpu.OpenGL.useFrame
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
+import me.anno.gpu.shader.OpenGLShader.Companion.attribute
 import me.anno.gpu.shader.Renderer
 import me.anno.gpu.shader.Shader
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.GPUFiltering
 import me.anno.tsunamis.FluidSim
-import me.anno.tsunamis.engine.CPUEngine
-import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
-import me.anno.tsunamis.setups.FluidSimSetup
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL20
 
-class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
+class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, height, { name ->
+    val buffer = Framebuffer(name, width, height, 1, 1, true, DepthBufferType.NONE)
+    buffer.autoUpdateMipmaps = false
+    buffer
+}) {
 
-    val src = Framebuffer("tsunami-gfx", width, height, 1, 1, true, DepthBufferType.NONE)
-    val tmp = Framebuffer("tsunami-gfx-tmp", width, height, 1, 1, true, DepthBufferType.NONE)
-    private var maxVelocity = 0f
-
-    override fun init(sim: FluidSim, setup: FluidSimSetup, gravity: Float) {
-        GFX.checkIsGFXThread()
-        super.init(sim, setup, gravity)
-        maxVelocity = super.computeMaxVelocity(gravity)
-        super.updateStatistics(sim)
-        uploadFramebuffer()
+    override fun createBuffer(buffer: Framebuffer, data: FloatArray) {
+        buffer.ensure() // otherwise getColor() may be undefined
+        buffer.getColor0().createRGBA(data, false)
+        for (tex in buffer.textures) {
+            tex.filtering = GPUFiltering.TRULY_NEAREST
+            tex.clamping = Clamping.CLAMP
+        }
     }
 
-    private fun uploadFramebuffer() {
-        val data = createTextureData(width, height, this)
-        src.ensure() // otherwise getColor() may be undefined
-        src.getColor0().createRGBA(data, false)
-        tmp.ensure()
-        tmp.getColor0().createRGBA(data, false)
+    override fun createBuffer(buffer: Framebuffer) {
+        buffer.ensure()
+        buffer.getColor0().createFP32()
+        for (tex in buffer.textures) {
+            tex.filtering = GPUFiltering.TRULY_NEAREST
+            tex.clamping = Clamping.CLAMP
+        }
     }
 
     override fun step(gravity: Float, scaling: Float) {
@@ -43,53 +43,19 @@ class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
         step(src, tmp, gravity, scaling)
     }
 
-    override fun setZero() {
-        GFX.checkIsGFXThread()
-        super.setZero()
-        uploadFramebuffer()
-    }
-
     override fun synchronize() {
         super.synchronize()
         synchronizeGraphics()
     }
 
-    override fun supportsMesh() = false
-
-    override fun supportsTexture() = true
-
-    override fun supportsAsyncCompute() = false
-
     override fun createFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src.getColor0()
-
-    override fun getFluidHeightAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
-
-    override fun getMomentumXAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
-
-    override fun getMomentumYAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
 
     override fun updateStatistics(sim: FluidSim) {
 
     }
 
-    override fun computeMaxVelocity(gravity: Float): Float {
-        // assumed to be constant for simplicity
-        return maxVelocity
-    }
-
-    override fun destroy() {
-        super.destroy()
-        src.destroy()
-        tmp.destroy()
+    override fun destroyBuffer(buffer: Framebuffer) {
+        buffer.destroy()
     }
 
     companion object {
@@ -102,17 +68,17 @@ class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
         }
 
         private fun createShader(x: Boolean): Shader {
+            val p = if (x) "xyw" else "xzw"
             val shader = Shader(
                 if (x) "gfxTimeStep(x)" else "gfxTimeStep(y)",
                 null, "" +
-                        "attribute vec2 attr0;\n" +
+                        "$attribute vec2 attr0;\n" +
                         "void main(){ gl_Position = vec4(attr0*2.0-1.0,0.5,1.0); }",
                 emptyList(), "" +
                         "uniform sampler2D state0;\n" +
                         "uniform ivec2 maxUV;\n" +
                         "uniform float timeScale;\n" +
                         "uniform float gravity;\n" +
-                        GLSLSolver.fWaveSolverFull +
                         GLSLSolver.fWaveSolverHalf +
                         // "(layout = 0) out vec4 gl_FragColor;\n" +
                         "void main(){\n" +
@@ -122,10 +88,7 @@ class GraphicsEngine(width: Int, height: Int) : CPUEngine(width, height) {
                         "   vec4 data0 = texelFetch(state0, max(uv-deltaUV, ivec2(0)), lod);\n" +
                         "   vec4 data1 = texelFetch(state0, uv, lod);\n" +
                         "   vec4 data2 = texelFetch(state0, min(uv+deltaUV, maxUV), lod);\n" +
-                        "   vec2 update = timeScale * (${ // 2 flops for multiplication
-                            if (x) "solveZW(data0.xyw, data1.xyw) + solveXY(data1.xyw, data2.xyw)" // 2 flops for addition + 2 * 41 flops for call
-                            else "  solveZW(data0.xzw, data1.xzw) + solveXY(data1.xzw, data2.xzw)"
-                        });\n" +
+                        "   vec2 update = timeScale * (solveZW(data0.$p, data1.$p) + solveXY(data1.$p, data2.$p));\n" + // 2 flops for multiplication + 2 flops for addition + 2 * 41 flops for call
                         "   vec4 newData = data1 - vec4(update.x, ${if (x) "update.y, 0.0" else "0.0, update.y"}, 0.0);\n" + // 2 flops for addition
                         "   if(newData.x < 0) newData.x = 0;\n" +
                         "   gl_FragColor = newData;\n" + // total: 88 flops

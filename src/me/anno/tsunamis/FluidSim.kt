@@ -352,11 +352,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             // reset engine
             // to make it cheaper, we could replace them...
             engine?.destroy()
-            engine = when (engineType) {
-                EngineType.CPU -> CPUEngine(w, h)
-                EngineType.GPU_GRAPHICS -> GraphicsEngine(w, h)
-                EngineType.GPU_COMPUTE -> ComputeEngine(w, h)
-            }
+            engine = engineType.create(w, h)
             this.engine = engine
 
             wantsReset = false

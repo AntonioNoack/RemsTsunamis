@@ -79,32 +79,33 @@ class NetCDFSetup : FluidSimSetup() {
     }
 
     override fun fillHeight(w: Int, h: Int, dst: FloatArray) {
-        val data = getData(bathymetryFile, false)!!
-        fillData(w, h, dst, data)
-        val h0 = -shoreCliffHeight
+        val bathymetryData = getData(bathymetryFile, false)!!
+        fillData(w, h, dst, bathymetryData)
+        val shoreMax = shoreCliffHeight
+        val shoreMin = -shoreMax
         for (i in dst.indices) {
             val bathymetry = dst[i]
             dst[i] = when {
                 bathymetry >= 0f -> 0f // beach / land
-                bathymetry > h0 -> h0 // cliff zone
+                bathymetry > shoreMin -> shoreMax // cliff zone
                 else -> -bathymetry // ocean
             }
         }
     }
 
     override fun fillBathymetry(w: Int, h: Int, dst: FloatArray) {
-        val bathymetryValues = getData(bathymetryFile, false)!!
+        val bathymetryData = getData(bathymetryFile, false)!!
         val displacement = getData(displacementFile, false)!!
-        fillData(w, h, dst, bathymetryValues)
-        val h1 = shoreCliffHeight
-        if (h1 > 0f) {
-            val h0 = -h1
+        fillData(w, h, dst, bathymetryData)
+        val shoreMax = shoreCliffHeight
+        if (shoreMax > 0f) {
+            val shoreMin = -shoreMax
             for (i in dst.indices) {
                 val bathymetry = dst[i]
                 dst[i] = when {
-                    bathymetry <= h0 || bathymetry >= h1 -> bathymetry
-                    bathymetry <= 0f -> h0
-                    else -> h1
+                    bathymetry <= shoreMin || bathymetry >= shoreMax -> bathymetry
+                    bathymetry < 0f -> shoreMin
+                    else -> shoreMax
                 }
             }
         }

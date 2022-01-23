@@ -228,7 +228,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
         fun copy(src: FloatArray, dst: FloatArray = FloatArray(src.size)): FloatArray {
             if (src.size * 4 >= 1_000_000) {
-                processBalanced(0, src.size, false) { i0, i1 ->
+                FluidSim.threadPool.processBalanced(0, src.size, false) { i0, i1 ->
                     System.arraycopy(src, i0, dst, i0, i1 - i0)
                 }
             }

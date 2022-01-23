@@ -33,3 +33,34 @@ While all measurements look rather slow, the GPU with compute is currently upto 
 Then I noticed that I forgot to set the scene size, and the test was only running on a 10x10 field.
 
 With the corrected test (field of 10800 x 6000), the results look reasonable, and GLSL on the GPU is about 50x faster than Kotlin on my CPU.
+
+## ARA cluster
+
+Running Rem's Engine on the cluster:
+
+If it does not work,
+- test on another computer
+- use LWJGL via different paths
+- use Vulkan (will be complicated, and surely take a week)
+- use CUDA + C/C++ instead
+
+#### Updates:
+
+I've done some first tests:
+- Java runs fine
+- LWJGL can call functions, but OpenGL is needed
+
+OpenGL needs, as far as I know, a window context of some sort.
+GLFW is the window library, that I usually use in Rem's Engine.
+EGL is another one, which is kind-of said to work without X11.
+
+- GLFW does not run, as it fails to create a window without X11
+- EGL may have a work-around, but it hasn't worked for me yet on ARA/gpu_test
+
+It works on gpu01.inf-ra.uni-jena.de (RTX 2070 Super), gpu02 (GTX 780), gpu03 (GTX 780).
+It fails on ARA/gpu_test and login.fmi.uni-jena.de.
+
+#### Solution:
+
+Creating a job with salloc, and logging in with the option "-X" solved the issue. A driver was found,
+and the "Tesla P100-PCIE-16GB/PCIe/SSE2" GPU was correctly detected.

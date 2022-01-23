@@ -1,6 +1,5 @@
 package me.anno.tsunamis.io
 
-import me.anno.config.DefaultStyle.black
 import me.anno.image.Image
 import me.anno.image.colormap.LinearColorMap
 import me.anno.maths.Maths.clamp
@@ -111,6 +110,8 @@ class VariableImage(variable: Variable) : Image(
     }
 
     companion object {
+
+        private const val black = 0xff shl 24
 
         fun getWidth(variable: Variable): Int {
             val shape = variable.shape

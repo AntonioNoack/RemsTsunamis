@@ -1,5 +1,5 @@
 <component name="libraryTable">
-  <library name="lwjgl-egl-javadoc">
+  <library name="lwjgl-egl">
     <CLASSES>
       <root url="jar://$PROJECT_DIR$/lib/lwjgl-egl.jar!/" />
     </CLASSES>

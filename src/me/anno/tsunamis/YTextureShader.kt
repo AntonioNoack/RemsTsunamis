@@ -38,13 +38,13 @@ object YTextureShader : ECSMeshShader("YTexture") {
         return list
     }
 
-    val getColorFunc = Function(
+    private val getColorFunc = Function(
         "" +
                 "vec3 getColor11(float v){\n" +
                 "   return v < 0.0 ?\n" +
                 "       mix(vec3(0.0,0.33,1.0), vec3(1.0), clamp(v+1.0, 0.0, 1.0)) :\n" +
                 "       mix(vec3(1.0), vec3(1.0,0.0,0.0), clamp(v, 0.0, 1.0));\n" +
-                "}" +
+                "}\n" +
                 "vec4 getColor(vec4 data){\n" +
                 "   float colorMapValue = clamp(data.a * colorMapScale.x + colorMapScale.y, 0.0, 1.0);\n" +
                 "   int   colorMapSize  = textureSize(colorMap, 0).x;\n" +
@@ -66,7 +66,6 @@ object YTextureShader : ECSMeshShader("YTexture") {
                 "}\n"
     )
 
-    // todo define colors in fragment stage for better interpolation
     override fun createVertexStage(instanced: Boolean, colors: Boolean): ShaderStage {
 
         val defines = "" +

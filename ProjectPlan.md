@@ -66,11 +66,11 @@ Each cell has influence on its two neighbors Possibilities:
 - [ ] two passes, one for left neighbor, one for right one 2x computation needed doubled number of passes
 - [x] just compute both in a single pass 2x computation needed 
 - [ ] shared memory within a compute group: within this groups, the results can be shared only ~1.05x computations needed
-- [ ] compute with integers instead of floats; probably would be complicated, error prone, and maybe would bring nothing
+<!-- - [ ] compute with integers instead of floats; probably would be complicated, error prone, and maybe would bring nothing -->
 
 #### Other optimizations
 
-- [ ] Disable mipmaps, currently they are always created after a texture has changed (mipmaps are used for rendering with less aliasing)
+- [x] Disable mipmaps, currently they are always created after a texture has changed (mipmaps are used for rendering with less aliasing)
 - [ ] It could be tested whether writing formulas as floats or with vectors (vec2) makes a difference.
 - [ ] If there is enough time, Pixel Buffer Objects could be used for optimized, asynchronous data transfer.
 
@@ -83,34 +83,9 @@ Another task:
 
 - [x] get java running / test it on ARA cluster or GPU node
 - [x] get engine running on ARA cluster or GPU node -> will LWJGL work?
-- [ ] define the benchmark options using Apache CLI
+- [x] configuration options with YAML files
 
-If not, 
-- test on another computer 
-- use LWJGL via different paths 
-- use Vulkan (will be complicated, and surely take a week)
-- use CUDA + C/C++ instead
-
-#### Updates:
-
-I've done some first tests:
-- Java runs fine
-- LWJGL can call functions, but OpenGL is needed
-
-OpenGL needs, as far as I know, a window context of some sort. 
-GLFW is the window library, that I usually use in Rem's Engine.
-EGL is another one, which is kind-of said to work without X11.
-
-- GLFW does not run, as it fails to create a window without X11
-- EGL may have a work-around, but it hasn't worked for me yet on ARA/gpu_test
-
-It works on gpu01.inf-ra.uni-jena.de (RTX 2070 Super), gpu02 (GTX 780), gpu03 (GTX 780).
-It fails on ARA/gpu_test and login.fmi.uni-jena.de.
-
-#### Solution:
-
-Creating a job with salloc, and logging in with the option "-X" solved the issue. A driver was found,
-and the "Tesla P100-PCIE-16GB/PCIe/SSE2" GPU was correctly detected.
+- [ ] print the actual simulation speed
 
 ### Measurements
 *until 30.01.2022 (day before final presentation)*

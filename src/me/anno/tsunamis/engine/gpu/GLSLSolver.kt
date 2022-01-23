@@ -45,32 +45,10 @@ object GLSLSolver {
             "   vec2 deltaH  = invLambda * vec2(df0 * lambda.y - df1, df1 - df0 * lambda.x);\n" + // 6 flops
             "   vec2 deltaHu = deltaH * lambda;\n" // 2 flops, total: 39 flops
 
-    const val fWaveSolverFull = "vec4 solve(vec3 data0, vec3 data1){\n" +
-            fWaveSolverParams +
-            "   if(h.x <= 0.0 && h.y <= 0.0) return vec4(0);\n" +
-            fWaveSolverBase + // 39 flops
-            "   vec4 dst = vec4(0.0);\n" +
-            "   if(lambda.x < 0.0){\n" +
-            "       dst.x  = deltaH.x;\n" +
-            "       dst.y  = deltaHu.x;\n" +
-            "   } else {\n" +
-            "       dst.z  = deltaH.x;\n" +
-            "       dst.w  = deltaHu.x;\n" +
-            "   }\n" +
-            "   if(lambda.y < 0.0){\n" +
-            "       dst.x += deltaH.y;\n" + // 1 flop
-            "       dst.y += deltaHu.y;\n" + // 1 flop
-            "   } else {\n" +
-            "       dst.z += deltaH.y;\n" + // 1 flop
-            "       dst.w += deltaHu.y;\n" + // 1 flop
-            "   }\n" +
-            "   return dst;\n" +
-            "}\n" // total: 41 flops
-
     const val fWaveSolverHalf = "" +
             "vec2 solveXY(vec3 data0, vec3 data1){\n" +
             fWaveSolverParams +
-            "   if(h.x <= 0.0 || h.y <= 0.0) return vec2(0);\n" +
+            "   if(h.x <= 0.0 || h.y <= 0.0) return vec2(0);\n" + // on land
             fWaveSolverBase + // 39 flops
             "   vec2 dst = vec2(0.0);\n" +
             "   if(lambda.x < 0.0){\n" +
@@ -98,6 +76,11 @@ object GLSLSolver {
             "   }\n" +
             "   return dst;\n" +
             "}\n"
+
+    // todo why is it not working inside 1 call???
+    const val fWaveSolverFull = fWaveSolverHalf + "vec4 solve(vec3 data0, vec3 data1){\n" +
+            "   return vec4(solveXY(data0, data1), solveZW(data0, data1));\n" +
+            "}\n" // total: 41 flops
 
 
     fun createTextureData(
