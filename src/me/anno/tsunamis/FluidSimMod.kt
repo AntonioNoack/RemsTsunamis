@@ -16,7 +16,7 @@ import me.anno.tsunamis.io.NetCDFImageCache
 import me.anno.tsunamis.setups.*
 import java.io.InputStream
 
-class TsunamiSim : Mod() {
+class FluidSimMod : Mod() {
 
     // the bytes, that identify a NetCDF file; such file signatures can be registered to identify file types within Rem's Engine
     private val netCDFSignatures = listOf(

@@ -23,12 +23,11 @@ import me.anno.io.serialization.SerializedProperty
 import me.anno.io.zip.InnerTmpFile
 import me.anno.maths.Maths.ceilDiv
 import me.anno.maths.Maths.clamp
+import me.anno.maths.Maths.mix
 import me.anno.tsunamis.draw.Drawing
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.engine.TsunamiEngine
-import me.anno.tsunamis.engine.gpu.ComputeEngine
-import me.anno.tsunamis.engine.gpu.GraphicsEngine
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFExport
 import me.anno.tsunamis.setups.FluidSimSetup
@@ -220,7 +219,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @Suppress("UNUSED")
     fun resetSimulation() {
         wantsReset = true
+        computingThread?.interrupt()
+        computingThread = null
         invalidateFluid()
+        onRestart()
     }
 
     @DebugAction
@@ -233,6 +235,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             engine.setZero()
         }
         invalidateFluid()
+        onRestart()
+    }
+
+    private fun onRestart() {
+        simulatedTime = 0.0
+        lastSimulatedTime = 0.0
+        simulationSpeed = 0f
     }
 
     @DebugAction
@@ -271,6 +280,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @NotSerializedProperty
     @DebugProperty
     var maxSurfaceHeight = 0f
+
+    @DebugProperty
+    @NotSerializedProperty
+    var simulationSpeed = 0f
 
     @NotSerializedProperty
     var computingThread: Thread? = null
@@ -380,6 +393,27 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         ensureFieldSize()
     }
 
+    @NotSerializedProperty
+    private var lastStep = 0L
+
+    @NotSerializedProperty
+    private var lastSimulatedTime = 0.0
+
+    @NotSerializedProperty
+    private var simulatedTime = 0.0
+
+    private fun computeSimulationSpeed() {
+        val time = System.nanoTime()
+        val delta = time - lastStep
+        lastStep = time
+        val delta2 = simulatedTime - lastSimulatedTime
+        if (delta2 > 0.0) {
+            lastSimulatedTime = simulatedTime
+            val mixFactor = 0.3f // temporal smoothing
+            simulationSpeed = mix(simulationSpeed, (delta2 * 1e9 / delta).toFloat(), mixFactor)
+        }
+    }
+
     override fun onUpdate(): Int {
         if (ensureFieldSize()) {
             val bm = bathymetryMesh
@@ -408,6 +442,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                                     }
                                 }
                                 invalidateFluid()
+                                computeSimulationSpeed()
                             }
                         }
                     } else {
@@ -415,6 +450,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                             step(dt)
                         }
                         invalidateFluid()
+                        computeSimulationSpeed()
                     }
                 }
             }
@@ -602,6 +638,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 val scaling = step / cellSizeMeters
                 computeStep(scaling)
                 done += step
+                simulatedTime += step
                 timeStepIndex++
             } else break
             val t1 = System.nanoTime()

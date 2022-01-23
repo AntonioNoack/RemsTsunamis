@@ -66,6 +66,7 @@ Theoretical GPU performance: 6.2 TFlops, 256 GB/s
 
 
 On Tesla P100, 16GB
+9.3 TFlops, 732 or 549GB/s bandwidth
 
 [10:04:08,INFO:Performance] CPU, 3 iterations
 [10:04:19,INFO:Performance] 11.098 s, 3.08 GFlop/s, 1.12 GB/s

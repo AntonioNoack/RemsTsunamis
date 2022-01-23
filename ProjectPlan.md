@@ -71,7 +71,7 @@ Each cell has influence on its two neighbors Possibilities:
 #### Other optimizations
 
 - [x] Disable mipmaps, currently they are always created after a texture has changed (mipmaps are used for rendering with less aliasing)
-- [ ] It could be tested whether writing formulas as floats or with vectors (vec2) makes a difference.
+<!-- - [ ] It could be tested whether writing formulas as floats or with vectors (vec2) makes a difference. -->
 - [ ] If there is enough time, Pixel Buffer Objects could be used for optimized, asynchronous data transfer.
 
 Another task:
@@ -85,7 +85,7 @@ Another task:
 - [x] get engine running on ARA cluster or GPU node -> will LWJGL work?
 - [x] configuration options with YAML files
 
-- [ ] print the actual simulation speed
+- [x] print the actual simulation speed
 
 ### Measurements
 *until 30.01.2022 (day before final presentation)*
