@@ -40,7 +40,20 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
 
     override fun step(gravity: Float, scaling: Float) {
         GFX.checkIsGFXThread()
-        step(src, tmp, gravity, scaling)
+        renderPurely {
+            step(shaders.first, src, tmp, gravity, scaling)
+            step(shaders.second, tmp, src, gravity, scaling)
+        }
+    }
+
+    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+        renderPurely {
+            if (x) {
+                step(shaders.first, src, tmp, gravity, scaling)
+            } else {
+                step(shaders.second, tmp, src, gravity, scaling)
+            }
+        }
     }
 
     override fun synchronize() {
@@ -75,6 +88,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
                         "$attribute vec2 attr0;\n" +
                         "void main(){ gl_Position = vec4(attr0*2.0-1.0,0.5,1.0); }",
                 emptyList(), "" +
+                        "precision highp float;\n" +
                         "uniform sampler2D state0;\n" +
                         "uniform ivec2 maxUV;\n" +
                         "uniform float timeScale;\n" +
@@ -108,13 +122,6 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
                 GL20.glUniform2i(shader.getUniformLocation("maxUV"), src.w - 1, src.h - 1)
                 src.bindTexture0(0, GPUFiltering.TRULY_NEAREST, Clamping.CLAMP)
                 GFX.flat01.draw(shader)
-            }
-        }
-
-        fun step(src: Framebuffer, tmp: Framebuffer, gravity: Float, timeScale: Float) {
-            renderPurely {
-                step(shaders.first, src, tmp, gravity, timeScale)
-                step(shaders.second, tmp, src, gravity, timeScale)
             }
         }
 

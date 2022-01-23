@@ -63,9 +63,9 @@ I don't know whether barriers will solve the problem of writing to a cell, readi
 #### Solutions, if it doesn't work
 
 Each cell has influence on its two neighbors Possibilities:
-- [ ] two passes, one for left neighbor, one for right one 2x computation needed doubled number of passes
+- [x] two passes, one for left neighbor, one for right one 2x computation needed doubled number of passes
 - [x] just compute both in a single pass 2x computation needed 
-- [ ] shared memory within a compute group: within this groups, the results can be shared only ~1.05x computations needed
+- [x] shared memory within a compute group: within this groups, the results can be shared only ~1.05x computations needed
 <!-- - [ ] compute with integers instead of floats; probably would be complicated, error prone, and maybe would bring nothing -->
 
 #### Other optimizations
@@ -76,7 +76,7 @@ Each cell has influence on its two neighbors Possibilities:
 
 Another task:
 
-- [ ] compare the ease of implementation between graphics and compute pipeline
+- [x] compare the ease of implementation between graphics and compute pipeline
 
 ### Performance Measurements & Towards HPC
 *test this until 24.01.2022*

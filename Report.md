@@ -64,3 +64,11 @@ It fails on ARA/gpu_test and login.fmi.uni-jena.de.
 
 Creating a job with salloc, and logging in with the option "-X" solved the issue. A driver was found,
 and the "Tesla P100-PCIE-16GB/PCIe/SSE2" GPU was correctly detected.
+
+## Graphics Pipeline VS Compute Pipeline - Ease of implementation
+
+Since on my GPU there is no performance difference, and on the Tesla P100, the graphics pipeline currently is twice as fast, 
+it's hard to generally use the compute pipeline.
+
+The main core is thanks to GLSL the same, so only loading, storing, and where the computation takes place differs.
+The compute pipeline offers more advanced features, but they may not be needed in every scenario.

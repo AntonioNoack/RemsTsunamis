@@ -9,17 +9,14 @@ import me.anno.gpu.hidden.HiddenOpenGLContext
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.ShaderLib
 import me.anno.gpu.shader.builder.Variable
-import me.anno.gpu.texture.Texture2D
 import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.tsunamis.FluidSim
-import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.getMaxValue
-import me.anno.tsunamis.engine.gpu.ComputeEngine.Companion.step
-import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.setups.CircularDiscontinuity
 import me.anno.tsunamis.setups.LinearDiscontinuity
 import me.anno.tsunamis.setups.NetCDFSetup
 import me.anno.utils.OS.desktop
+import me.anno.utils.Sleep.waitUntil
 import me.anno.utils.types.Vectors.print
 import me.anno.video.VideoCreator.Companion.renderVideo
 import org.apache.logging.log4j.LogManager
@@ -51,8 +48,6 @@ object ComputeTest {
     @JvmStatic
     fun main(args: Array<String>) {
 
-        // todo apache cli
-
         // todo or we could read those yaml config files :)
 
         // 10800 x 6000
@@ -67,25 +62,25 @@ object ComputeTest {
         val w2 = 1024
         val h2 = w2 * h / w
 
+        val cflFactor = 0.45f
+
+        val gravity = 9.81f
+
         // HeadlessContext.createContext(w, h, false)
         HiddenOpenGLContext.createOpenGL(w, h)
         ShaderLib.init()
 
-        val sim = FluidSim()
-        sim.computeOnly = true
-        sim.width = w
-        sim.height = h
-        sim.cellSizeMeters = 100f
+        val engine = ComputeEngine(w, h)
         var maxMomentum = 0f
 
-        when (setupType) {
+        val setup = when (setupType) {
             0 -> {
                 val setup = LinearDiscontinuity()
                 setup.heightLeft = 0.5f
                 setup.heightRight = 1.0f
                 setup.hasBorder = true
                 setup.borderHeight = 10f
-                sim.setup = setup
+                setup
             }
             1 -> {
                 val setup = CircularDiscontinuity()
@@ -93,7 +88,7 @@ object ComputeTest {
                 setup.heightOuter = 1.0f
                 setup.hasBorder = true
                 setup.borderHeight = 10f
-                sim.setup = setup
+                setup
             }
             2 -> {
                 val setup = NetCDFSetup()
@@ -102,71 +97,33 @@ object ComputeTest {
                 setup.displacementFile = folder.getChild("tohoku_gebco08_ucsb3_250m_displ.nc")
                 setup.hasBorder = true
                 setup.borderHeight = 10f
-                val originalWidth = 10800
-                sim.cellSizeMeters = 250f * originalWidth / w
-                sim.setup = setup
                 maxMomentum = 1314f // computed using Reduction
+                setup
             }
+            else -> throw RuntimeException("Simulation needs setup")
         }
 
-        val setup = sim.setup ?: throw RuntimeException("Simulation needs setup")
-        while (!sim.ensureFieldSize()) {
-            LOGGER.info("Waiting for setup to load")
-            Thread.sleep(500)
-        }
+        waitUntil(true) { setup.isReady() }
+        engine.init(FluidSim(), setup, gravity)
 
         LOGGER.info("Preferred size: ${setup.getPreferredNumCellsX()} x ${setup.getPreferredNumCellsY()}")
 
-        val src = Texture2D("src", w, h, 1)
-        val tmp = Texture2D("tmp", w, h, 1)
+        val scaling = cflFactor / engine.computeMaxVelocity(gravity)
 
-        val engine = sim.engine as CPUEngine
-        sim.setGhostOutflow(w, h, engine.fluidHeight)
-        sim.setGhostOutflow(w, h, engine.fluidMomentumX)
-        sim.setGhostOutflow(w, h, engine.fluidMomentumY)
-        sim.setGhostOutflow(w, h, engine.bathymetry)
-
-        val data = createTextureData(w, h, engine)
-        src.createRGBA(data, false)
-        tmp.createRGBA(data, false)
-
-        val maxTimeStep = sim.computeMaxTimeStep()
-        val timeScale = maxTimeStep / sim.cellSizeMeters
-
-        // call barrier for memory read
-        // glMemoryBarrier(GL_PIXELBUFFER_BARRIER_BIT)
-
-        /*for (i in 0 until numStepsPerFrame * 20) {
-            computeTimeStep(timeScale, fluidSim.gravity, src, tmp)
-        }
-
-        glMemoryBarrier(GL_ALL_BARRIER_BITS)
-
-        FramebufferToMemory.createImage(src, false, false)
-            .write(desktop.getChild("h.png"))*/
-
-        /* ImageWriter.writeImageFloat(w + 2, h + 2, "h.png", true, fh)
-
-         val normalize = true
-         ImageWriter.writeImageFloat(w + 2, h + 2, "h.png", normalize, fh)
-         ImageWriter.writeImageFloat(w + 2, h + 2, "hu.png", normalize, hu)
-         ImageWriter.writeImageFloat(w + 2, h + 2, "hv.png", normalize, hv)
-         ImageWriter.writeImageFloat(w + 2, h + 2, "b.png", normalize, bh)*/
-
-        val maxFluidHeight = getMaxValue(sim.width, sim.height, sim.coarsening, engine.fluidHeight, engine.bathymetry)
+        val maxFluidHeight = getMaxValue(w, h, 1, engine.fluidHeight, engine.bathymetry)
 
         val maxValues = Vector4f()
         val srcFB = Framebuffer("src", w2, h2, 1, 1, true, DepthBufferType.NONE)
         renderVideo(w2, h2, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB) { callback ->
             for (i in 0 until numStepsPerFrame) {
-                step(sim.gravity, timeScale, src, tmp)
+                engine.step(gravity, scaling)
             }
-            maxValues.max(Reduction.reduce(src, Reduction.MAX_RA))
+            maxValues.max(Reduction.reduce(engine.src, Reduction.MAX_RA))
             useFrame(srcFB) {
                 val shader = showWavesShader.value
                 shader.use()
                 shader.v3f("scale", 1f / maxFluidHeight, 1f / maxMomentum, 1f / maxMomentum)
-                src.bind(0)
+                engine.src.bind(0)
                 GFX.flat01.draw(shader)
             }
             callback()

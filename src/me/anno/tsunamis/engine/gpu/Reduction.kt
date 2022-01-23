@@ -9,13 +9,15 @@ import me.anno.gpu.texture.Texture2D
 import me.anno.maths.Maths.ceilDiv
 import org.joml.Vector2i
 import org.joml.Vector4f
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL20.glUniform2i
+import org.lwjgl.opengl.GL11C
+import org.lwjgl.opengl.GL20C.glUniform2i
 import org.lwjgl.opengl.GL42C
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 object Reduction {
+
+    // todo integrate this into Rem's Engine, as this could use useful for other projects
 
     data class Operation(
         val name: String,
@@ -92,10 +94,10 @@ object Reduction {
 
         // read pixel
         GL42C.glMemoryBarrier(GL42C.GL_ALL_BARRIER_BITS)
-        GL11.glFlush(); GL11.glFinish() // wait for everything to be drawn
+        GL11C.glFlush(); GL11C.glFinish() // wait for everything to be drawn
         buffer.position(0)
         src.bind(0)
-        GL11.glGetTexImage(src.target, 0, GL11.GL_RGBA, GL11.GL_FLOAT, buffer)
+        GL11C.glGetTexImage(src.target, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT, buffer)
         GFX.check()
 
         return Vector4f(buffer[0], buffer[1], buffer[2], buffer[3])

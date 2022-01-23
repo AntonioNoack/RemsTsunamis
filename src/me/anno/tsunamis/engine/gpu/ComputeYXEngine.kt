@@ -11,7 +11,7 @@ import org.joml.Vector2i
 import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
 import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
-class ComputeEngine(width: Int, height: Int) :
+class ComputeYXEngine(width: Int, height: Int) :
     GPUEngine<Texture2D>(width, height, {
         val tex = Texture2D(it, width, height, 1)
         tex.autoUpdateMipmaps = false
@@ -58,14 +58,6 @@ class ComputeEngine(width: Int, height: Int) :
 
     companion object {
 
-        fun createTexture(name: String, width: Int, height: Int): Texture2D {
-            val tex = Texture2D(name, width, height, 1)
-            tex.autoUpdateMipmaps = false
-            tex.filtering = GPUFiltering.TRULY_NEAREST
-            tex.clamping = Clamping.CLAMP
-            return tex
-        }
-
         private fun createShader(x: Boolean): ComputeShader {
             val p = if (x) "xyw" else "xzw"
             return ComputeShader(
@@ -79,7 +71,7 @@ class ComputeEngine(width: Int, height: Int) :
                         "uniform float gravity;\n" +
                         GLSLSolver.fWaveSolverHalf +
                         "void main(){\n" +
-                        "   ivec2 uv1 = ivec2(gl_GlobalInvocationID.xy);\n" +
+                        "   ivec2 uv1 = ivec2(gl_GlobalInvocationID.yx);\n" +
                         "   if(uv1.x <= maxUV.x && uv1.y <= maxUV.y){\n" +
                         "       ivec2 deltaUV = ivec2(${if (x) "1,0" else "0,1"});\n" +
                         "       vec4 data0 = imageLoad(src, clamp(uv1 - deltaUV, ivec2(0), maxUV));\n" + // left/top
@@ -103,7 +95,7 @@ class ComputeEngine(width: Int, height: Int) :
             shader.v2i("maxUV", src.w - 1, src.h - 1)
             ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
             ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
-            shader.runBySize(src.w, src.h)
+            shader.runBySize(src.h, src.w)
         }
 
     }

@@ -8,7 +8,7 @@ object GLSLSolver {
 
     /**
      * texture memory layout: height, momentum x, momentum y, bathymetry
-     * ghost outflow is handled by the clamping
+     * ghost outflow is handled by clamping coordinates
      * */
 
     private const val fWaveSolverParams = "" +
@@ -81,7 +81,6 @@ object GLSLSolver {
     const val fWaveSolverFull = fWaveSolverHalf + "vec4 solve(vec3 data0, vec3 data1){\n" +
             "   return vec4(solveXY(data0, data1), solveZW(data0, data1));\n" +
             "}\n" // total: 41 flops
-
 
     fun createTextureData(
         w: Int, h: Int,

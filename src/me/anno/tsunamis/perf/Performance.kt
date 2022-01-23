@@ -60,6 +60,10 @@ After disabling auto-generating mipmaps (the same):
 [07:51:15,INFO:Performance] GPU_COMPUTE, 419 iterations
 [07:51:25,INFO:Performance] 9.875 s, 483.8971563488645 GFlop/s (25.13x, 0.98x), 175.962602308678 GB/s
 
+Theoretical CPU performance: 6 cores * 3.4GHz base clock * 4 (avx256) = 81.6 GFlops (FMA currently ignored, because that can be only used sometimes)
+DDR4 3200: 25.6 GB/s (but it should be dual channel, so x2?)
+Theoretical GPU performance: 6.2 TFlops, 256 GB/s
+
 
 On Tesla P100, 16GB
 
@@ -72,9 +76,88 @@ On Tesla P100, 16GB
 [10:04:30,INFO:Performance] GPU_COMPUTE, 1096 iterations
 [10:04:40,INFO:Performance] 9.963 s, 1255.30 GFlop/s (406.97x, 0.58x), 456.47 GB/s
 
-Theoretical CPU performance: 6 cores * 3.4GHz base clock * 4 (avx256) = 81.6 GFlops (FMA currently ignored, because that can be only used sometimes)
-DDR4 3200: 25.6 GB/s (but it should be dual channel, so x2?)
-Theoretical GPU performance: 6.2 TFlops, 256 GB/s
+with more solver variants:
+
+[12:12:25,INFO:Performance] CPU, 3 iterations
+[12:12:36,INFO:Performance] 11.048 s, 3.10 GFlop/s, 1.13 GB/s
+[12:12:40,INFO:Performance] GPU_GRAPHICS, 1716 iterations
+[12:12:49,INFO:Performance] 8.867 s, 2208.23 GFlop/s (712.71x), 802.99 GB/s
+[12:12:52,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
+[12:12:52,INFO:ComputeShader] Max units per group: 1536
+[12:12:52,INFO:Performance] GPU_COMPUTE, 950 iterations
+[12:13:02,INFO:Performance] 9.968 s, 1087.49 GFlop/s (350.99x, 0.49x), 395.45 GB/s
+[12:13:06,INFO:Performance] GPU_2PASSES, 459 iterations
+[12:13:16,INFO:Performance] 9.835 s, 532.55 GFlop/s (171.88x, 0.24x, 0.49x), 193.65 GB/s
+[12:13:19,INFO:Performance] GPU_SHARED_MEMORY, 1010 iterations
+[12:13:29,INFO:Performance] 9.996 s, 1152.90 GFlop/s (372.10x, 0.52x, 1.06x, 2.16x), 419.24 GB/s
+
+with x/y comparison
+
+[13:48:45,INFO:Performance] CPU, 3 iterations
+[13:48:59,INFO:Performance] X half-step is 0.96x faster than Y half-step
+[13:48:59,INFO:Performance] 10.408 s, 3.29 GFlop/s, 1.20 GB/s
+[13:49:03,INFO:Performance] GPU_GRAPHICS, 1718 iterations
+[13:49:13,INFO:Performance] X half-step is 1.00x faster than Y half-step
+[13:49:13,INFO:Performance] 8.874 s, 2209.02 GFlop/s (671.63x), 803.28 GB/s
+[13:49:17,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
+[13:49:17,INFO:ComputeShader] Max units per group: 1536
+[13:49:17,INFO:Performance] GPU_COMPUTE, 950 iterations
+[13:49:29,INFO:Performance] X half-step is 1.14x faster than Y half-step
+[13:49:29,INFO:Performance] 9.968 s, 1087.55 GFlop/s (330.66x, 0.49x), 395.47 GB/s
+[13:49:32,INFO:Performance] GPU_2PASSES, 458 iterations
+[13:49:44,INFO:Performance] X half-step is 1.08x faster than Y half-step
+[13:49:44,INFO:Performance] 9.813 s, 532.58 GFlop/s (161.92x, 0.24x, 0.49x), 193.66 GB/s
+[13:49:47,INFO:Performance] GPU_SHARED_MEMORY, 1009 iterations
+[13:49:59,INFO:Performance] X half-step is 1.30x faster than Y half-step
+[13:49:59,INFO:Performance] 9.986 s, 1152.96 GFlop/s (350.54x, 0.52x, 1.06x, 2.16x), 419.26 GB/s
+
+with yx test
+
+[19:18:43,INFO:Performance] CPU, 3 iterations
+[19:18:57,INFO:Performance] X half-step is 0.98x faster than Y half-step
+[19:18:57,INFO:Performance] 10.664 s, 3.21 GFlop/s, 1.17 GB/s
+[19:19:00,INFO:Performance] GPU_GRAPHICS, 756 iterations
+[19:19:05,INFO:Performance] X half-step is 1.01x faster than Y half-step
+[19:19:05,INFO:Performance] 3.875 s, 2226.21 GFlop/s (693.52x), 809.53 GB/s
+[19:19:09,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
+[19:19:09,INFO:ComputeShader] Max units per group: 1536
+[19:19:09,INFO:Performance] GPU_COMPUTE, 950 iterations
+[19:19:21,INFO:Performance] X half-step is 1.14x faster than Y half-step
+[19:19:21,INFO:Performance] 9.968 s, 1087.46 GFlop/s (338.77x, 0.49x), 395.44 GB/s
+[19:19:24,INFO:Performance] GPU_2PASSES, 459 iterations
+[19:19:36,INFO:Performance] X half-step is 1.08x faster than Y half-step
+[19:19:36,INFO:Performance] 9.834 s, 532.59 GFlop/s (165.91x, 0.24x, 0.49x), 193.67 GB/s
+[19:19:39,INFO:Performance] GPU_SHARED_MEMORY, 1010 iterations
+[19:19:51,INFO:Performance] X half-step is 1.30x faster than Y half-step
+[19:19:51,INFO:Performance] 9.996 s, 1152.98 GFlop/s (359.18x, 0.52x, 1.06x, 2.16x), 419.27 GB/s
+[19:19:55,INFO:Performance] GPU_COMPUTE_YX, 62 iterations
+[19:20:07,INFO:Performance] X half-step is 1.08x faster than Y half-step
+[19:20:07,INFO:Performance] 10.100 s, 70.05 GFlop/s (21.82x, 0.03x, 0.06x, 0.13x, 0.06x), 25.47 GB/s
+
+
+RX 580 again, more gpu solver variants
+
+[12:06:19,INFO:Performance] CPU, 16 iterations
+[12:06:29,INFO:Performance] 9.884 s, 18.46 GFlop/s, 6.71 GB/s
+[12:06:31,INFO:Performance] GPU_GRAPHICS, 403 iterations
+[12:06:41,INFO:Performance] 9.902 s, 464.17 GFlop/s (25.14x), 168.79 GB/s
+[12:06:43,INFO:ComputeShader] Max compute group count: 65535 x 65535 x 65535
+[12:06:43,INFO:ComputeShader] Max units per group: 1024
+[12:06:44,INFO:Performance] GPU_COMPUTE, 429 iterations
+[12:06:54,INFO:Performance] 9.847 s, 496.85 GFlop/s (26.91x, 1.07x), 180.67 GB/s
+[12:06:57,INFO:Performance] GPU_2PASSES, 183 iterations
+[12:07:07,INFO:Performance] 9.995 s, 208.80 GFlop/s (11.31x, 0.45x, 0.42x), 75.93 GB/s
+[12:07:10,INFO:Performance] GPU_SHARED_MEMORY, 416 iterations
+[12:07:20,INFO:Performance] 9.806 s, 483.85 GFlop/s (26.21x, 1.04x, 0.97x, 2.32x), 175.94 GB/s
+[19:12:27,INFO:Performance] GPU_COMPUTE_YX, 300 iterations
+[19:12:39,INFO:Performance] X half-step is 0.99x faster than Y half-step
+[19:12:39,INFO:Performance] 9.937 s, 344.31 GFlop/s, 125.20 GB/s
+
+s_hadoop, 2x Intel Xeon Gold 6140 18 Core 2.3 GHz
+
+[14:44:50,INFO:Performance] CPU, 36 iterations
+[14:45:00,INFO:Performance] X half-step is 0.97x faster than Y half-step
+[14:45:00,INFO:Performance] 9.088 s, 45.20 GFlop/s, 16.44 GB/s
 
  * */
 fun main(args: Array<String>) {
@@ -90,6 +173,8 @@ fun main(args: Array<String>) {
 
     val testCPU = config.getOrDefault("testCPU", true)
     val testGPU = config.getOrDefault("testGPU", true)
+
+    val compareXY = config.getOrDefault("compareXY", true)
 
     if (!testCPU && !testGPU) {
         logger.warn("Neither CPU not GPU were tested")
@@ -114,8 +199,6 @@ fun main(args: Array<String>) {
 
     val speeds = ArrayList<Double>()
 
-    waitUntil(true) { setup.isReady() }
-
     logger.info("Field Size $width x $height")
 
     val types = ArrayList<EngineType>()
@@ -125,13 +208,14 @@ fun main(args: Array<String>) {
         types += EngineType.GPU_COMPUTE
         types += EngineType.GPU_2PASSES
         types += EngineType.GPU_SHARED_MEMORY
+        types += EngineType.GPU_COMPUTE_YX
     }
 
     for (type in types) {
 
-        val engine = type.create(width, height)
-
         waitUntil(true) { setup.isReady() }
+
+        val engine = type.create(width, height)
         engine.init(FluidSim(), setup, gravity)
 
         // step a few iterations
@@ -154,14 +238,33 @@ fun main(args: Array<String>) {
         val numIterations =
             max(warmupIterations, (warmupIterations * testDurationSeconds / ((t1 - t0) * 1e-9)).roundToInt())
         logger.info("$type, $numIterations iterations")
-        val t2 = System.nanoTime()
 
         // run performance measurements
+        val t2 = System.nanoTime()
         for (i in 0 until numIterations) {
             engine.step(gravity, scaling)
         }
         engine.synchronize()
         val t3 = System.nanoTime()
+
+        // compare step on x and y axis
+        if (compareXY) {
+            val numIterations2 = max(1, numIterations / 5)
+            val t4 = System.nanoTime()
+            for (i in 0 until numIterations2) {
+                engine.halfStep(gravity, scaling, true)
+            }
+            engine.synchronize()
+            val t5 = System.nanoTime()
+            for (i in 0 until numIterations2) {
+                engine.halfStep(gravity, scaling, false)
+            }
+            engine.synchronize()
+            val t6 = System.nanoTime()
+            val dtX = (t5 - t4) * 1e-9
+            val dtY = (t6 - t5) * 1e-9
+            logger.info("X half-step is ${(dtY / dtX).f2()}x faster than Y half-step")
+        }
 
         // compute results
         val duration = (t3 - t2) * 1e-9
@@ -187,6 +290,10 @@ fun main(args: Array<String>) {
         speeds.add(durPerIteration)
         System.gc()
 
+    }
+
+    if (testGPU && config.getOrDefault("egl", false)) {
+        HeadlessOpenGLContext.destroyContext()
     }
 
     // stop all remaining threads gracefully

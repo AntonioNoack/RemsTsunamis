@@ -40,7 +40,20 @@ class TwoPassesEngine(width: Int, height: Int) :
 
     override fun step(gravity: Float, scaling: Float) {
         GFX.checkIsGFXThread()
-        step(gravity, scaling, src, delta, tmp)
+        renderPurely {
+            step(shaders0.first, shaders1.first, true, gravity, scaling, src, delta, tmp)
+            step(shaders0.second, shaders1.second, false, gravity, scaling, tmp, delta, src)
+        }
+    }
+
+    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+        renderPurely {
+            if (x) {
+                step(shaders0.first, shaders1.first, x, gravity, scaling, src, delta, tmp)
+            } else {
+                step(shaders0.second, shaders1.second, x, gravity, scaling, tmp, delta, src)
+            }
+        }
     }
 
     override fun synchronize() {
@@ -143,13 +156,6 @@ class TwoPassesEngine(width: Int, height: Int) :
             ComputeShader.bindTexture(1, tmp, ComputeTextureMode.READ)
             ComputeShader.bindTexture(2, dst, ComputeTextureMode.WRITE)
             shader1.runBySize(src.w, src.h)
-        }
-
-        fun step(gravity: Float, timeScale: Float, src: Texture2D, delta: Texture2D, tmp: Texture2D) {
-            renderPurely {
-                step(shaders0.first, shaders1.first, true, gravity, timeScale, src, delta, tmp)
-                step(shaders0.second, shaders1.second, false, gravity, timeScale, tmp, delta, src)
-            }
         }
 
     }

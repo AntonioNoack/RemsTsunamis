@@ -36,7 +36,20 @@ class SharedMemoryEngine(width: Int, height: Int) :
 
     override fun step(gravity: Float, scaling: Float) {
         GFX.checkIsGFXThread()
-        step(gravity, scaling, src, tmp)
+        renderPurely {
+            step(shaders.first, true, gravity, scaling, src, tmp)
+            step(shaders.second, false, gravity, scaling, tmp, src)
+        }
+    }
+
+    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+        renderPurely {
+            if (x) {
+                step(shaders.first, true, gravity, scaling, src, tmp)
+            } else {
+                step(shaders.second, false, gravity, scaling, tmp, src)
+            }
+        }
     }
 
     override fun synchronize() {
@@ -122,14 +135,6 @@ class SharedMemoryEngine(width: Int, height: Int) :
                 shader.runBySize(src.w, ceilDiv(src.h * updateSize, writeSize))
             }
         }
-
-        fun step(gravity: Float, timeScale: Float, src: Texture2D, tmp: Texture2D) {
-            renderPurely {
-                step(shaders.first, true, gravity, timeScale, src, tmp)
-                step(shaders.second, false, gravity, timeScale, tmp, src)
-            }
-        }
-
 
     }
 

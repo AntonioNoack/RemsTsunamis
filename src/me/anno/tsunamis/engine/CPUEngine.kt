@@ -8,7 +8,7 @@ import me.anno.tsunamis.Visualisation
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
-import me.anno.utils.hpc.HeavyProcessing.processBalanced
+import me.anno.utils.LOGGER
 import kotlin.math.max
 import kotlin.math.min
 
@@ -81,67 +81,72 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         }
     }
 
-    override fun step(gravity: Float, scaling: Float) {
+    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
 
         val width = width
         val height = height
 
-        val h0 = fluidHeight
-        val hu0 = fluidMomentumX
+        if (x) {
 
-        setGhostOutflow(width, height, h0)
-        setGhostOutflow(width, height, hu0)
+            val h0 = fluidHeight
+            val hu0 = fluidMomentumX
 
-        // todo copy in parallel
-        val h1 = copy(h0, tmpH)
-        val hu1 = copy(hu0, tmpHuX)
+            setGhostOutflow(width, height, h0)
+            setGhostOutflow(width, height, hu0)
 
-        val b = bathymetry
+            val h1 = copy(h0, tmpH)
+            val hu1 = copy(hu0, tmpHuX)
 
-        val stride = width + 2
+            val b = bathymetry
 
-        // step on x axis
-        FluidSim.threadPool.processBalanced(-1, height + 1, 4) { y0, y1 ->
-            val tmp4f = FluidSim.tmpV4ByThread.get()
-            for (y in y0 until y1) {
-                var index0 = getIndex(-1, y)
-                for (x in -1 until width) {
-                    FWaveSolver.solve(index0, index0 + 1, h0, hu0, b, h1, hu1, gravity, scaling, tmp4f)
-                    index0++
+            // step on x axis
+            FluidSim.threadPool.processBalanced(-1, height + 1, 4) { y0, y1 ->
+                val tmp4f = FluidSim.tmpV4ByThread.get()
+                for (y in y0 until y1) {
+                    var index0 = getIndex(-1, y)
+                    for (xi in -1 until width) {
+                        FWaveSolver.solve(index0, index0 + 1, h0, hu0, b, h1, hu1, gravity, scaling, tmp4f)
+                        index0++
+                    }
                 }
             }
-        }
 
-        val hv1 = fluidMomentumY
+        } else {
 
-        setGhostOutflow(width, height, h1)
-        setGhostOutflow(width, height, hv1)
+            val h1 = tmpH
+            val hv1 = fluidMomentumY
 
-        // copy data, only height has changed, so only height needs to be switched
-        val h2 = copy(h1, h0)
-        val hv2 = copy(hv1, tmpHuY)
+            setGhostOutflow(width, height, h1)
+            setGhostOutflow(width, height, hv1)
 
-        // step on y axis
-        FluidSim.threadPool.processBalanced(-1, height, 4) { y0, y1 ->
-            val tmp4f = FluidSim.tmpV4ByThread.get()
-            for (y in y0 until y1) {
-                var index0 = getIndex(0, y)
-                for (x in 0 until width) {
-                    FWaveSolver.solve(index0, index0 + stride, h1, hv1, b, h2, hv2, gravity, scaling, tmp4f)
-                    index0++
+            // copy data, only height has changed, so only height needs to be switched
+            val h2 = copy(h1, fluidHeight)
+            val hv2 = copy(hv1, tmpHuY)
+
+            // step on y axis
+            val b = bathymetry
+            val stride = width + 2
+            FluidSim.threadPool.processBalanced(-1, height, 4) { y0, y1 ->
+                val tmp4f = FluidSim.tmpV4ByThread.get()
+                for (y in y0 until y1) {
+                    var index0 = getIndex(0, y)
+                    for (xi in 0 until width) {
+                        FWaveSolver.solve(index0, index0 + stride, h1, hv1, b, h2, hv2, gravity, scaling, tmp4f)
+                        index0++
+                    }
                 }
             }
+
+            // switch the buffers for the momentum
+            var tmp = fluidMomentumX
+            fluidMomentumX = tmpHuX
+            tmpHuX = tmp
+
+            tmp = fluidMomentumY
+            fluidMomentumY = tmpHuY
+            tmpHuY = tmp
+
         }
-
-        // switch the buffers for the momentum
-        var tmp = fluidMomentumX
-        fluidMomentumX = tmpHuX
-        tmpHuX = tmp
-
-        tmp = fluidMomentumY
-        fluidMomentumY = tmpHuY
-        tmpHuY = tmp
-
     }
 
     override fun updateStatistics(sim: FluidSim) {
@@ -228,9 +233,11 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
         fun copy(src: FloatArray, dst: FloatArray = FloatArray(src.size)): FloatArray {
             if (src.size * 4 >= 1_000_000) {
-                FluidSim.threadPool.processBalanced(0, src.size, false) { i0, i1 ->
+                FluidSim.threadPool.processBalanced(0, min(src.size, dst.size), false) { i0, i1 ->
                     System.arraycopy(src, i0, dst, i0, i1 - i0)
                 }
+            } else {
+                System.arraycopy(src, 0, dst, 0, min(src.size, dst.size))
             }
             return dst
         }

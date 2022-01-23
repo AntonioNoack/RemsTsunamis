@@ -23,7 +23,12 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     abstract fun init(sim: FluidSim, setup: FluidSimSetup, gravity: Float)
 
-    abstract fun step(gravity: Float, scaling: Float)
+    open fun step(gravity: Float, scaling: Float){
+        halfStep(gravity, scaling, true)
+        halfStep(gravity, scaling, false)
+    }
+
+    abstract fun halfStep(gravity: Float, scaling: Float, x: Boolean)
 
     abstract fun supportsAsyncCompute(): Boolean
 
