@@ -4,7 +4,6 @@ import me.anno.Engine
 import me.anno.gpu.hidden.HiddenOpenGLContext
 import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.files.InvalidRef
-import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.aracluster.HeadlessOpenGLContext
 import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.perf.SetupLoader.getOrDefault
@@ -154,6 +153,18 @@ RX 580 again, more gpu solver variants
 [19:12:39,INFO:Performance] X half-step is 0.99x faster than Y half-step
 [19:12:39,INFO:Performance] 9.937 s, 344.31 GFlop/s, 125.20 GB/s
 
+fp16 maths with fp32 bathymetry:
+[08:48:00,INFO:Performance] GPU_COMPUTE_FP16B32, 835 iterations
+[08:48:12,INFO:Performance] X half-step is 1.12x faster than Y half-step
+[08:48:12,INFO:Performance] 9.754 s, 976.27 GFlop/s, 155.32 GB/s
+
+fp16 maths with fp16 bathymetry:
+[08:44:19,INFO:Performance] GPU_COMPUTE_FP16B16, 881 iterations
+[08:44:31,INFO:Performance] X half-step is 1.13x faster than Y half-step
+[08:44:31,INFO:Performance] 9.654 s, 1040.73 GFlop/s, 118.26 GB/s
+
+
+
 s_hadoop, 2x Intel Xeon Gold 6140 18 Core 2.3 GHz
 
 [14:44:50,INFO:Performance] CPU, 36 iterations
@@ -210,6 +221,8 @@ fun main(args: Array<String>) {
         types += EngineType.GPU_2PASSES
         types += EngineType.GPU_SHARED_MEMORY
         types += EngineType.GPU_COMPUTE_YX
+        types += EngineType.GPU_COMPUTE_FP16B32
+        types += EngineType.GPU_COMPUTE_FP16B16
     }
 
     for (type in types) {
@@ -217,7 +230,7 @@ fun main(args: Array<String>) {
         waitUntil(true) { setup.isReady() }
 
         val engine = type.create(width, height)
-        engine.init(FluidSim(), setup, gravity)
+        engine.init(null, setup, gravity)
 
         // step a few iterations
         val scaling = cflFactor / engine.computeMaxVelocity(gravity)
@@ -273,8 +286,14 @@ fun main(args: Array<String>) {
         val flops = 88 * 2.0 * numIterations * (width * height).toDouble()
         val gigaFlops = flops / duration * 1e-9
 
-        // (load + store), (4 floats each (h,hu,hv,b)), 2 half-steps, for all cells
-        val bandwidth = 2 * 4 * 4 * numIterations * 2 * (width * height).toDouble() / duration / 1e9
+        val bandwidth = when (type) {
+            // (load 3*fp16 + store 2*fp16), 2 half-steps, for all cells
+            EngineType.GPU_COMPUTE_FP16B16 -> (3 + 2) * 2 * numIterations * 2 * (width * height).toDouble() / duration / 1e9
+            // (load 2*fp16 + fp32 + store 2*fp16), 2 half-steps, for all cells
+            EngineType.GPU_COMPUTE_FP16B32 -> ((3 + 2) * 2 + 4) * numIterations * 2 * (width * height).toDouble() / duration / 1e9
+            // (load + store), (4 floats each (h,hu,hv,b)), 2 half-steps, for all cells
+            else -> 2 * 4 * 4 * numIterations * 2 * (width * height).toDouble() / duration / 1e9
+        }
 
         // print results
         val speedups = if (speeds.isNotEmpty())

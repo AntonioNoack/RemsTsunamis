@@ -10,7 +10,6 @@ import me.anno.maths.Maths.ceilDiv
 import org.joml.Vector2i
 import org.joml.Vector4f
 import org.lwjgl.opengl.GL11C
-import org.lwjgl.opengl.GL20C.glUniform2i
 import org.lwjgl.opengl.GL42C
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -84,8 +83,8 @@ object Reduction {
             val dstBuffer = FBStack["red", w, h, TargetType.FloatTarget4, 1, false]
             dstBuffer.ensure()
             val dst = dstBuffer.getColor0()
-            glUniform2i(shader.getUniformLocation("inSize"), src.w, src.h)
-            glUniform2i(shader.getUniformLocation("outSize"), w, h)
+            shader.v2i("inSize", src.w, src.h)
+            shader.v2i("outSize", w, h)
             ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
             ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
             shader.runBySize(w, h)

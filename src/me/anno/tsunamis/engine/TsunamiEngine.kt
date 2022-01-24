@@ -21,7 +21,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     var bathymetry: FloatArray = f0
 
-    abstract fun init(sim: FluidSim, setup: FluidSimSetup, gravity: Float)
+    abstract fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float)
 
     open fun step(gravity: Float, scaling: Float){
         halfStep(gravity, scaling, true)

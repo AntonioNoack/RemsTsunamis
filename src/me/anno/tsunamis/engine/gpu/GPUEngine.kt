@@ -1,6 +1,10 @@
 package me.anno.tsunamis.engine.gpu
 
 import me.anno.gpu.GFX
+import me.anno.gpu.framebuffer.Framebuffer
+import me.anno.gpu.texture.Clamping
+import me.anno.gpu.texture.GPUFiltering
+import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
@@ -12,7 +16,7 @@ abstract class GPUEngine<Buffer>(
     val tmp: Buffer
 ) : CPUEngine(width, height) {
 
-    constructor(width: Int, height: Int, generator: (name: String) -> Buffer):
+    constructor(width: Int, height: Int, generator: (name: String) -> Buffer) :
             this(width, height, generator("src"), generator("tmp"))
 
     abstract fun createBuffer(buffer: Buffer)
@@ -22,11 +26,11 @@ abstract class GPUEngine<Buffer>(
 
     private var maxVelocity = 0f
 
-    override fun init(sim: FluidSim, setup: FluidSimSetup, gravity: Float) {
+    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float) {
         GFX.checkIsGFXThread()
         super.init(sim, setup, gravity)
         maxVelocity = super.computeMaxVelocity(gravity)
-        super.updateStatistics(sim)
+        if (sim != null) super.updateStatistics(sim)
         uploadMainBuffer()
         createBuffer(tmp)
     }
@@ -81,6 +85,24 @@ abstract class GPUEngine<Buffer>(
         super.destroy()
         destroyBuffer(src)
         destroyBuffer(tmp)
+    }
+
+    companion object {
+
+        fun initTextures(fb: Framebuffer){
+            fb.autoUpdateMipmaps = false
+            fb.ensure()
+            for(tex in fb.textures){
+                initTexture(tex)
+            }
+        }
+
+        fun initTexture(tex: Texture2D){
+            tex.autoUpdateMipmaps = false
+            tex.filtering = GPUFiltering.TRULY_NEAREST
+            tex.clamping = Clamping.CLAMP
+        }
+
     }
 
 }

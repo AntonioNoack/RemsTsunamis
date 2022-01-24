@@ -285,6 +285,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @NotSerializedProperty
     var simulationSpeed = 0f
 
+    @DebugProperty
+    val stepsPerSecond get() = simulationSpeed / maxTimeStep
+
     @NotSerializedProperty
     var computingThread: Thread? = null
 
@@ -623,7 +626,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         )
     }
 
-    fun step(dt: Float, numMaxIterations: Int = 10): Float {
+    @SerializedProperty
+    var computeBudgetFPS = 60f
+
+    @SerializedProperty
+    var maxIterationsPerFrame = 1000
+
+    fun step(dt: Float, numMaxIterations: Int = maxIterationsPerFrame): Float {
         var done = 0f
         var i = 0
         val t0 = System.nanoTime()
@@ -642,7 +651,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 timeStepIndex++
             } else break
             val t1 = System.nanoTime()
-            if (t1 - t0 > 1e9 / 60f) break
+            if ((t1 - t0) * computeBudgetFPS > 1e9f) break
             Thread.sleep(0) // for interrupts
         }
         engine.updateStatistics(this)

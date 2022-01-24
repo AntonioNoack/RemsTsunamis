@@ -12,13 +12,7 @@ import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
 import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
 open class ComputeEngine(width: Int, height: Int) :
-    GPUEngine<Texture2D>(width, height, {
-        val tex = Texture2D(it, width, height, 1)
-        tex.autoUpdateMipmaps = false
-        tex.filtering = GPUFiltering.TRULY_NEAREST
-        tex.clamping = Clamping.CLAMP
-        tex
-    }) {
+    GPUEngine<Texture2D>(width, height, { createTexture(it, width, height) }) {
 
     override fun createBuffer(buffer: Texture2D) {
         buffer.createFP32()
@@ -60,9 +54,7 @@ open class ComputeEngine(width: Int, height: Int) :
 
         fun createTexture(name: String, width: Int, height: Int): Texture2D {
             val tex = Texture2D(name, width, height, 1)
-            tex.autoUpdateMipmaps = false
-            tex.filtering = GPUFiltering.TRULY_NEAREST
-            tex.clamping = Clamping.CLAMP
+            initTexture(tex)
             return tex
         }
 
@@ -82,9 +74,9 @@ open class ComputeEngine(width: Int, height: Int) :
                         "   ivec2 uv1 = ivec2(gl_GlobalInvocationID.xy);\n" +
                         "   if(uv1.x <= maxUV.x && uv1.y <= maxUV.y){\n" +
                         "       ivec2 deltaUV = ivec2(${if (x) "1,0" else "0,1"});\n" +
-                        "       vec4 data0 = imageLoad(src, clamp(uv1 - deltaUV, ivec2(0), maxUV));\n" + // left/top
+                        "       vec4 data0 = imageLoad(src, max(uv1 - deltaUV, ivec2(0)));\n" + // left/top
                         "       vec4 data1 = imageLoad(src, uv1);\n" +
-                        "       vec4 data2 = imageLoad(src, clamp(uv1 + deltaUV, ivec2(0), maxUV));\n" + // right/bottom
+                        "       vec4 data2 = imageLoad(src, min(uv1 + deltaUV, maxUV));\n" + // right/bottom
                         "       vec2 update = timeScale * (solveZW(data0.$p, data1.$p) + solveXY(data1.$p, data2.$p));\n" + // 2 flops + 2 flops for +, plus 2 * 41 flops for calls
                         "       vec4 newData = data1 - vec4(update.x, ${if (x) "update.y, 0.0" else "0.0, update.y"}, 0.0);\n" + // 2 flops
                         "       if(newData.x < 0) newData.x = 0;\n" +

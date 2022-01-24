@@ -104,7 +104,7 @@ object ComputeTest {
         }
 
         waitUntil(true) { setup.isReady() }
-        engine.init(FluidSim(), setup, gravity)
+        engine.init(null, setup, gravity)
 
         LOGGER.info("Preferred size: ${setup.getPreferredNumCellsX()} x ${setup.getPreferredNumCellsY()}")
 

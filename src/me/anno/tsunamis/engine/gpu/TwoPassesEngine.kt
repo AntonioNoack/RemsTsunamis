@@ -18,7 +18,7 @@ class TwoPassesEngine(width: Int, height: Int) : ComputeEngine(width, height) {
 
     private val delta = createTexture("delta", width + 1, height + 1)
 
-    override fun init(sim: FluidSim, setup: FluidSimSetup, gravity: Float) {
+    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float) {
         super.init(sim, setup, gravity)
         createBuffer(delta)
     }

@@ -12,11 +12,10 @@ import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.GPUFiltering
 import me.anno.tsunamis.FluidSim
 import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL20
 
 class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, height, { name ->
     val buffer = Framebuffer(name, width, height, 1, 1, true, DepthBufferType.NONE)
-    buffer.autoUpdateMipmaps = false
+    initTextures(buffer)
     buffer
 }) {
 
@@ -119,7 +118,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
                 shader.use()
                 shader.v1f("gravity", gravity)
                 shader.v1f("timeScale", timeScale)
-                GL20.glUniform2i(shader.getUniformLocation("maxUV"), src.w - 1, src.h - 1)
+                shader.v2i("maxUV", src.w - 1, src.h - 1)
                 src.bindTexture0(0, GPUFiltering.TRULY_NEAREST, Clamping.CLAMP)
                 GFX.flat01.draw(shader)
             }

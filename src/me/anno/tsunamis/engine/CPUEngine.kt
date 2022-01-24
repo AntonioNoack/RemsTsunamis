@@ -35,7 +35,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
     @NotSerializedProperty
     private var tmpHuY = FluidSim.f0
 
-    override fun init(sim: FluidSim, setup: FluidSimSetup, gravity: Float) {
+    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float) {
         val w = width
         val h = height
         val targetSize = (w + 2) * (h + 2)

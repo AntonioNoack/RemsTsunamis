@@ -9,7 +9,9 @@ enum class EngineType(val id: Int) {
     GPU_COMPUTE(2),
     GPU_2PASSES(3),
     GPU_SHARED_MEMORY(4),
-    GPU_COMPUTE_YX(5);
+    GPU_COMPUTE_YX(5),
+    GPU_COMPUTE_FP16B32(6),
+    GPU_COMPUTE_FP16B16(7);
 
     fun create(w: Int, h: Int) = create(this, w, h)
 
@@ -22,6 +24,8 @@ enum class EngineType(val id: Int) {
                 GPU_2PASSES -> TwoPassesEngine(w, h)
                 GPU_SHARED_MEMORY -> SharedMemoryEngine(w, h)
                 GPU_COMPUTE_YX -> ComputeYXEngine(w, h)
+                GPU_COMPUTE_FP16B32 -> Compute16B32Engine(w, h)
+                GPU_COMPUTE_FP16B16 -> Compute16B16Engine(w, h)
             }
         }
     }
