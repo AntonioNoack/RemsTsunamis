@@ -67,72 +67,32 @@ Theoretical GPU performance: 6.2 TFlops, 256 GB/s
 On Tesla P100, 16GB
 9.3 TFlops, 732 or 549GB/s bandwidth
 
-[10:04:08,INFO:Performance] CPU, 3 iterations
-[10:04:19,INFO:Performance] 11.098 s, 3.08 GFlop/s, 1.12 GB/s
-[10:04:22,INFO:Performance] GPU_GRAPHICS, 758 iterations
-[10:04:26,INFO:Performance] 3.968 s, 2179.74 GFlop/s (706.68x), 792.63 GB/s
-[10:04:30,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
-[10:04:30,INFO:ComputeShader] Max units per group: 1536
-[10:04:30,INFO:Performance] GPU_COMPUTE, 1096 iterations
-[10:04:40,INFO:Performance] 9.963 s, 1255.30 GFlop/s (406.97x, 0.58x), 456.47 GB/s
-
-with more solver variants:
-
-[12:12:25,INFO:Performance] CPU, 3 iterations
-[12:12:36,INFO:Performance] 11.048 s, 3.10 GFlop/s, 1.13 GB/s
-[12:12:40,INFO:Performance] GPU_GRAPHICS, 1716 iterations
-[12:12:49,INFO:Performance] 8.867 s, 2208.23 GFlop/s (712.71x), 802.99 GB/s
-[12:12:52,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
-[12:12:52,INFO:ComputeShader] Max units per group: 1536
-[12:12:52,INFO:Performance] GPU_COMPUTE, 950 iterations
-[12:13:02,INFO:Performance] 9.968 s, 1087.49 GFlop/s (350.99x, 0.49x), 395.45 GB/s
-[12:13:06,INFO:Performance] GPU_2PASSES, 459 iterations
-[12:13:16,INFO:Performance] 9.835 s, 532.55 GFlop/s (171.88x, 0.24x, 0.49x), 193.65 GB/s
-[12:13:19,INFO:Performance] GPU_SHARED_MEMORY, 1010 iterations
-[12:13:29,INFO:Performance] 9.996 s, 1152.90 GFlop/s (372.10x, 0.52x, 1.06x, 2.16x), 419.24 GB/s
-
-with x/y comparison
-
-[13:48:45,INFO:Performance] CPU, 3 iterations
-[13:48:59,INFO:Performance] X half-step is 0.96x faster than Y half-step
-[13:48:59,INFO:Performance] 10.408 s, 3.29 GFlop/s, 1.20 GB/s
-[13:49:03,INFO:Performance] GPU_GRAPHICS, 1718 iterations
-[13:49:13,INFO:Performance] X half-step is 1.00x faster than Y half-step
-[13:49:13,INFO:Performance] 8.874 s, 2209.02 GFlop/s (671.63x), 803.28 GB/s
-[13:49:17,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
-[13:49:17,INFO:ComputeShader] Max units per group: 1536
-[13:49:17,INFO:Performance] GPU_COMPUTE, 950 iterations
-[13:49:29,INFO:Performance] X half-step is 1.14x faster than Y half-step
-[13:49:29,INFO:Performance] 9.968 s, 1087.55 GFlop/s (330.66x, 0.49x), 395.47 GB/s
-[13:49:32,INFO:Performance] GPU_2PASSES, 458 iterations
-[13:49:44,INFO:Performance] X half-step is 1.08x faster than Y half-step
-[13:49:44,INFO:Performance] 9.813 s, 532.58 GFlop/s (161.92x, 0.24x, 0.49x), 193.66 GB/s
-[13:49:47,INFO:Performance] GPU_SHARED_MEMORY, 1009 iterations
-[13:49:59,INFO:Performance] X half-step is 1.30x faster than Y half-step
-[13:49:59,INFO:Performance] 9.986 s, 1152.96 GFlop/s (350.54x, 0.52x, 1.06x, 2.16x), 419.26 GB/s
-
-with yx test
-
-[19:18:43,INFO:Performance] CPU, 3 iterations
-[19:18:57,INFO:Performance] X half-step is 0.98x faster than Y half-step
-[19:18:57,INFO:Performance] 10.664 s, 3.21 GFlop/s, 1.17 GB/s
-[19:19:00,INFO:Performance] GPU_GRAPHICS, 756 iterations
-[19:19:05,INFO:Performance] X half-step is 1.01x faster than Y half-step
-[19:19:05,INFO:Performance] 3.875 s, 2226.21 GFlop/s (693.52x), 809.53 GB/s
-[19:19:09,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
-[19:19:09,INFO:ComputeShader] Max units per group: 1536
-[19:19:09,INFO:Performance] GPU_COMPUTE, 950 iterations
-[19:19:21,INFO:Performance] X half-step is 1.14x faster than Y half-step
-[19:19:21,INFO:Performance] 9.968 s, 1087.46 GFlop/s (338.77x, 0.49x), 395.44 GB/s
-[19:19:24,INFO:Performance] GPU_2PASSES, 459 iterations
-[19:19:36,INFO:Performance] X half-step is 1.08x faster than Y half-step
-[19:19:36,INFO:Performance] 9.834 s, 532.59 GFlop/s (165.91x, 0.24x, 0.49x), 193.67 GB/s
-[19:19:39,INFO:Performance] GPU_SHARED_MEMORY, 1010 iterations
-[19:19:51,INFO:Performance] X half-step is 1.30x faster than Y half-step
-[19:19:51,INFO:Performance] 9.996 s, 1152.98 GFlop/s (359.18x, 0.52x, 1.06x, 2.16x), 419.27 GB/s
-[19:19:55,INFO:Performance] GPU_COMPUTE_YX, 62 iterations
-[19:20:07,INFO:Performance] X half-step is 1.08x faster than Y half-step
-[19:20:07,INFO:Performance] 10.100 s, 70.05 GFlop/s (21.82x, 0.03x, 0.06x, 0.13x, 0.06x), 25.47 GB/s
+[09:18:30,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
+[09:18:30,INFO:ComputeShader] Max units per group: 1536
+[09:17:59,INFO:Performance] CPU, 3 iterations
+[09:18:13,INFO:Performance] X half-step is 1.00x faster than Y half-step
+[09:18:13,INFO:Performance] 11.001 s, 3.11 GFlop/s, 1.13 GB/s
+[09:18:16,INFO:Performance] GPU_GRAPHICS, 1717 iterations
+[09:18:27,INFO:Performance] X half-step is 1.00x faster than Y half-step
+[09:18:27,INFO:Performance] 8.872 s, 2208.35 GFlop/s (709.69x), 803.04 GB/s
+[09:18:30,INFO:Performance] GPU_COMPUTE, 952 iterations
+[09:18:42,INFO:Performance] X half-step is 1.13x faster than Y half-step
+[09:18:42,INFO:Performance] 9.977 s, 1088.79 GFlop/s (349.90x, 0.49x), 395.92 GB/s
+[09:18:45,INFO:Performance] GPU_2PASSES, 429 iterations
+[09:18:56,INFO:Performance] X half-step is 1.08x faster than Y half-step
+[09:18:56,INFO:Performance] 9.193 s, 532.50 GFlop/s (171.13x, 0.24x, 0.49x), 193.63 GB/s
+[09:18:59,INFO:Performance] GPU_SHARED_MEMORY, 1010 iterations
+[09:19:11,INFO:Performance] X half-step is 1.30x faster than Y half-step
+[09:19:11,INFO:Performance] 9.996 s, 1152.94 GFlop/s (370.52x, 0.52x, 1.06x, 2.17x), 419.25 GB/s
+[09:19:14,INFO:Performance] GPU_COMPUTE_YX, 62 iterations
+[09:19:26,INFO:Performance] X half-step is 1.08x faster than Y half-step
+[09:19:26,INFO:Performance] 10.095 s, 70.08 GFlop/s (22.52x, 0.03x, 0.06x, 0.13x, 0.06x), 25.48 GB/s
+[09:19:29,INFO:Performance] GPU_COMPUTE_FP16B32, 1089 iterations
+[09:19:41,INFO:Performance] X half-step is 0.99x faster than Y half-step
+[09:19:41,INFO:Performance] 9.970 s, 1246.31 GFlop/s (400.52x, 0.56x, 1.14x, 2.34x, 1.08x, 17.78x), 198.28 GB/s
+[09:19:44,INFO:Performance] GPU_COMPUTE_FP16B16, 1112 iterations
+[09:19:56,INFO:Performance] X half-step is 0.97x faster than Y half-step
+[09:19:56,INFO:Performance] 9.979 s, 1271.56 GFlop/s (408.64x, 0.58x, 1.17x, 2.39x, 1.10x, 18.14x, 1.02x), 144.50 GB/s
 
 
 RX 580 again, more gpu solver variants
