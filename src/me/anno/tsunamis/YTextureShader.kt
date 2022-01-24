@@ -8,7 +8,7 @@ import me.anno.gpu.shader.builder.ShaderStage
 import me.anno.gpu.shader.builder.Variable
 import me.anno.gpu.shader.builder.VariableMode
 
-object YTextureShader : ECSMeshShader("YTexture") {
+class YTextureShader private constructor(private val halfPrecision: Boolean) : ECSMeshShader("YTexture") {
 
     override fun createVertexAttributes(instanced: Boolean, colors: Boolean): ArrayList<Variable> {
         val list = super.createVertexAttributes(instanced, colors)
@@ -22,7 +22,14 @@ object YTextureShader : ECSMeshShader("YTexture") {
                 else -> false
             }
         }
-        list.add(Variable(GLSLType.S2D, "fluidData"))
+        if (halfPrecision) {
+            list.add(Variable(GLSLType.S2D, "fluidSurface"))
+            list.add(Variable(GLSLType.S2D, "fluidMomentumX"))
+            list.add(Variable(GLSLType.S2D, "fluidMomentumY"))
+            list.add(Variable(GLSLType.S2D, "fluidBathymetry"))
+        } else {
+            list.add(Variable(GLSLType.S2D, "fluidData"))
+        }
         list.add(Variable(GLSLType.V4F, "fluidDataI", VariableMode.OUT))
         list.add(Variable(GLSLType.S2D, "colorMap"))
         list.add(Variable(GLSLType.V2F, "colorMapScale"))
@@ -39,6 +46,7 @@ object YTextureShader : ECSMeshShader("YTexture") {
     }
 
     private val getColorFunc = Function(
+        "", "color-func",
         "" +
                 "vec3 getColor11(float v){\n" +
                 "   return v < 0.0 ?\n" +
@@ -66,6 +74,25 @@ object YTextureShader : ECSMeshShader("YTexture") {
                 "}\n"
     )
 
+    private val getPixelFunc = Function(
+        "", "pixel-func",
+        "" +
+                "vec4 getFluidData(ivec2 uv, ivec2 fieldSizeM1){\n" +
+                "   int lod = 0;\n" +
+                "   uv = clamp(uv, ivec2(0), fieldSizeM1);\n" +
+                (if (halfPrecision) {
+                    "" +
+                            "float surf      = texelFetch(fluidSurface, uv, lod).x;\n" +
+                            "float momentumX = texelFetch(fluidMomentumX, uv, lod).x;\n" +
+                            "float momentumY = texelFetch(fluidMomentumY, uv, lod).x;\n" +
+                            "float bath      = texelFetch(fluidBathymetry, uv, lod).x;\n" +
+                            "return vec4(surf - bath, momentumX, momentumY, bath);\n"
+                } else {
+                    "return texelFetch(fluidData, uv, lod);\n"
+                }) +
+                "};\n"
+    )
+
     override fun createVertexStage(instanced: Boolean, colors: Boolean): ShaderStage {
 
         val defines = "" +
@@ -87,10 +114,9 @@ object YTextureShader : ECSMeshShader("YTexture") {
                     "int lod = 0;\n" +
                     "#define SURFACE(h) dot(h, heightMask)\n" +
                     "#define SURFACE2(h) dot(h, heightMask) * (h.r > 0.0 ? fluidHeightScale : 1.0)\n" +
-                    "#define TEXTURE fluidData\n" +
                     "#define COARSE_INDEX_TO_FINE0(x,w,cw) x < 2 || cw <= 4 ? x : cw - x <= 2 ? x + w - cw : 2 + (x-2)*(w-4)/(cw-4)\n" +
                     "#define COARSE_INDEX_TO_FINE1(x,w,cw) x < 1 || cw <= 2 ? x : cw - x <= 1 ? x + w - cw : 1 + (x-1)*(w-2)/(cw-2)\n" +
-                    "ivec2 fieldSize = textureSize(TEXTURE, lod);\n" +
+                    "ivec2 fieldSize = textureSize(${if (halfPrecision) "fluidSurface" else "fluidData"}, lod);\n" +
                     "int instanceId = int(gl_InstanceID);\n" +
                     "int cellIndex  = instanceId >> 1;\n" +
                     "int partOfCell = gl_VertexID + (instanceId & 1) * 3;\n" +
@@ -111,14 +137,14 @@ object YTextureShader : ECSMeshShader("YTexture") {
                     "ivec2 cell = ivec2(cellXi, cellYi);\n" +
                     "vec2 invFieldSize = 1.0 / vec2(fieldSize-1);\n" +
                     "vec2 uv = vec2(cellXi, cellYi) * invFieldSize;\n" + // [0,1]
-                    "vec4 data = texelFetch(TEXTURE, clamp(cell, ivec2(0), fieldSizeM1), lod);\n" +
+                    "vec4 data = getFluidData(cell, fieldSizeM1);\n" +
                     "localPosition = vec3(float(cellXi) * cellSize, SURFACE2(data), float(cellYi) * cellSize) + cellOffset;\n" +
                     "#ifdef COLORS\n" +
                     // calculate the normals
-                    "   vec4 dxp = texelFetch(TEXTURE, clamp(cell + ivec2(1, 0), ivec2(0), fieldSizeM1), lod);\n" +
-                    "   vec4 dxm = texelFetch(TEXTURE, clamp(cell - ivec2(1, 0), ivec2(0), fieldSizeM1), lod);\n" +
-                    "   vec4 dyp = texelFetch(TEXTURE, clamp(cell + ivec2(0, 1), ivec2(0), fieldSizeM1), lod);\n" +
-                    "   vec4 dym = texelFetch(TEXTURE, clamp(cell - ivec2(0, 1), ivec2(0), fieldSizeM1), lod);\n" +
+                    "   vec4 dxp = getFluidData(cell + ivec2(1, 0), fieldSizeM1);\n" +
+                    "   vec4 dxm = getFluidData(cell - ivec2(1, 0), fieldSizeM1);\n" +
+                    "   vec4 dyp = getFluidData(cell + ivec2(0, 1), fieldSizeM1);\n" +
+                    "   vec4 dym = getFluidData(cell - ivec2(0, 1), fieldSizeM1);\n" +
                     "   vec3 normals = normalize(vec3(\n" +
                     "       SURFACE2(dxp) - SURFACE2(dxm),\n" +
                     "       cellSize * 2.0,\n" +
@@ -130,14 +156,14 @@ object YTextureShader : ECSMeshShader("YTexture") {
                     // instanced is not supported
                     "finalPosition = localTransform * vec4(localPosition, 1.0);\n" +
                     "#ifdef COLORS\n" +
-                    "   normal = normalize(localTransform * vec4(normals, 0.0));\n" +
+                    "   normal  = normalize(localTransform * vec4(normals, 0.0));\n" +
                     "   tangent = normalize(localTransform * vec4(tangents, 0.0));\n" +
                     "   if(nearestNeighborColors){\n" +
                     "       if(coarseSize.x > 0 && coarseSize.x != fieldSize.x){\n" +
                     "           cellX0 = COARSE_INDEX_TO_FINE1(cellX0, fieldSize.x, coarseSize.x);\n" +
                     "           cellY0 = COARSE_INDEX_TO_FINE1(cellY0, fieldSize.y, coarseSize.y);\n" +
                     "       }\n" +
-                    "       data = texelFetch(TEXTURE, clamp(ivec2(cellX0, cellY0), ivec2(0), fieldSizeM1), lod);\n" +
+                    "       data = getFluidData(ivec2(cellX0, cellY0), fieldSizeM1);\n" +
                     "       vertexColor = getColor(data);\n" + // no interpolation required
                     "   } else {\n" +
                     "       fluidDataI = data;\n" +
@@ -146,7 +172,10 @@ object YTextureShader : ECSMeshShader("YTexture") {
                     "#endif\n" +
                     "gl_Position = transform * vec4(finalPosition, 1.0);\n" +
                     ShaderLib.positionPostProcessing
-        ).apply { functions.add(getColorFunc) }
+        ).apply {
+            functions.add(getColorFunc)
+            functions.add(getPixelFunc)
+        }
     }
 
     override fun createFragmentStage(instanced: Boolean): ShaderStage {
@@ -241,6 +270,11 @@ object YTextureShader : ECSMeshShader("YTexture") {
 
     init {
         glslVersion = 330
+    }
+
+    companion object {
+        val rgbaShader = YTextureShader(false)
+        val r16fShader = YTextureShader(true)
     }
 
 }

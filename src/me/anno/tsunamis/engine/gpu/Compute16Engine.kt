@@ -24,6 +24,8 @@ class Compute16Engine(
     val bathymetryFp16: Boolean = true
 ) : CPUEngine(width, height) {
 
+    // todo fix bug: when switching between their two types, sometimes the engine resets the progress... why?
+
     private val shaders = if (bathymetryFp16) b16Shaders else b32Shaders
 
     override fun isCompatible(engine: TsunamiEngine): Boolean {
@@ -48,6 +50,9 @@ class Compute16Engine(
     private val momentumX1 = Texture2D("mx16-1", width, height, 1)
     private val momentumY0 = Texture2D("my16-0", width, height, 1)
     private val momentumY1 = Texture2D("my16-1", width, height, 1)
+
+    val momentumX get() = if(isEvenIteration) momentumX0 else momentumX1
+    val momentumY get() = if(isEvenIteration) momentumY0 else momentumY1
 
     // can be replaced, if we adjust our render shader
     private val rendered = Texture2D("rend16", width, height, 1)
@@ -110,6 +115,7 @@ class Compute16Engine(
         ComputeShader.bindTexture(4, bathymetryTex, ComputeTextureMode.WRITE, if (bathymetryFp16) GL_R16F else GL_R32F)
         shader.runBySize(width, height)
         isEvenIteration = true
+        hasChanged = true
     }
 
     override fun destroy() {

@@ -28,6 +28,7 @@ import me.anno.tsunamis.draw.Drawing
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.engine.TsunamiEngine
+import me.anno.tsunamis.engine.gpu.Compute16Engine
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFExport
 import me.anno.tsunamis.setups.FluidSimSetup
@@ -536,10 +537,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         colorMap: ColorMap?,
         cellSize: Float,
         cw: Int,
-        ch: Int,
-        fluidTexture: Texture2D
+        ch: Int
     ) {
-        material["fluidData"] = TypeValue(GLSLType.S2D, fluidTexture)
         if (colorMap != null) {
             colorMap.createTexture(colorMapTexture, false)
             colorMapTexture.clamping = Clamping.CLAMP
@@ -620,11 +619,20 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         findVisualScale()
         val cellSize = getCellSize(cellSizeMeters, w, cw)
         if (useTextureData2) {
-            mesh.materials = fluidMaterialList
-            val material = MaterialCache[fluidMaterialList[0]]
+            val list = if (engine is Compute16Engine) fluidMaterialList16 else fluidMaterialList32
+            mesh.materials = list
+            val material = MaterialCache[list[0]]
             if (material != null) {
-                val fluidTexture = engine.requestFluidTexture(w, h, cw, ch)
-                setMaterialProperties(material, colorMap, cellSize, cw, ch, fluidTexture)
+                if (engine is Compute16Engine) {
+                    material["fluidSurface"] = TypeValue(GLSLType.S2D, engine.surface0)
+                    material["fluidMomentumX"] = TypeValue(GLSLType.S2D, engine.momentumX)
+                    material["fluidMomentumY"] = TypeValue(GLSLType.S2D, engine.momentumY)
+                    material["fluidBathymetry"] = TypeValue(GLSLType.S2D, engine.bathymetryTex)
+                } else {
+                    val fluidTexture = engine.requestFluidTexture(w, h, cw, ch)
+                    material["fluidData"] = TypeValue(GLSLType.S2D, fluidTexture)
+                }
+                setMaterialProperties(material, colorMap, cellSize, cw, ch)
             }
             ensureTriangleCount(mesh, cw, ch)
         } else {
@@ -911,7 +919,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     override val className: String = "Tsunamis/FluidSim"
 
     @NotSerializedProperty
-    val fluidMaterialList by lazy { createMaterials() }
+    val fluidMaterialList16 by lazy { createMaterials(true) }
+
+    @NotSerializedProperty
+    val fluidMaterialList32 by lazy { createMaterials(false) }
     // val solidMaterialList by lazy { createMaterials() }
 
     companion object {
@@ -942,10 +953,14 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             }
         }
 
-        private fun createMaterials(): List<FileReference> {
+        private fun createMaterials(halfPrecision: Boolean): List<FileReference> {
             val prefab = Prefab("Material")
             prefab.createInstance() // ensure there is an instance
-            prefab.setProperty("shader", YTextureShader)
+            prefab.setProperty(
+                "shader",
+                if (halfPrecision) YTextureShader.r16fShader
+                else YTextureShader.rgbaShader
+            )
             return listOf(InnerTmpFile.InnerTmpPrefabFile(prefab))
         }
 
@@ -956,6 +971,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val f0 = FloatArray(0)
         val i0 = IntArray(0)
         val f12 = FloatArray(12)
+
     }
 
 }
