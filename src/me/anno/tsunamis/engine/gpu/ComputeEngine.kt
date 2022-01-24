@@ -3,16 +3,18 @@ package me.anno.tsunamis.engine.gpu
 import me.anno.gpu.GFX
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
-import me.anno.gpu.texture.Clamping
-import me.anno.gpu.texture.GPUFiltering
 import me.anno.gpu.texture.Texture2D
+import me.anno.tsunamis.draw.Drawing
 import me.anno.tsunamis.engine.gpu.GraphicsEngine.Companion.synchronizeGraphics
 import org.joml.Vector2i
-import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
-import org.lwjgl.opengl.GL42C.glMemoryBarrier
+import org.lwjgl.opengl.GL42C.*
 
 open class ComputeEngine(width: Int, height: Int) :
     GPUEngine<Texture2D>(width, height, { createTexture(it, width, height) }) {
+
+    override fun setFromTextureRGBA32F(texture: Texture2D) {
+        copyTextureRGBA32F(texture, src)
+    }
 
     override fun createBuffer(buffer: Texture2D) {
         buffer.createFP32()
@@ -48,9 +50,21 @@ open class ComputeEngine(width: Int, height: Int) :
         synchronizeGraphics()
     }
 
-    override fun createFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src
+    override fun requestFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src
 
     companion object {
+
+        fun copyTextureRGBA32F(src: Texture2D, dst: Texture2D) {
+            if (src.w != dst.w || src.h != dst.h) throw IllegalArgumentException("Textures must have same size")
+            val shader = Drawing.rgbaShaders.copyShader
+            shader.use()
+            shader.v2i("offset", 0, 0)
+            shader.v2i("inSize", src.w, src.h)
+            ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
+            ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            shader.runBySize(src.w, src.h)
+            GFX.check()
+        }
 
         fun createTexture(name: String, width: Int, height: Int): Texture2D {
             val tex = Texture2D(name, width, height, 1)

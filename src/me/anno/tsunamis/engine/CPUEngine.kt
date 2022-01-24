@@ -1,14 +1,17 @@
 package me.anno.tsunamis.engine
 
 import me.anno.ecs.components.mesh.ProceduralMesh
+import me.anno.gpu.GFX
 import me.anno.gpu.texture.Texture2D
+import me.anno.gpu.texture.Texture2D.Companion.unpackAlignment
 import me.anno.io.serialization.NotSerializedProperty
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.Visualisation
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
-import me.anno.utils.LOGGER
+import org.lwjgl.opengl.GL11C.*
+import java.nio.ByteOrder
 import kotlin.math.max
 import kotlin.math.min
 
@@ -79,6 +82,57 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
             val inside = getIndex(x, height - 1)
             v[outside] = v[inside]
         }
+    }
+
+    override fun setFromTextureRGBA32F(texture: Texture2D) {
+
+        val width = texture.w
+        val height = texture.h
+
+        val data = Texture2D.bufferPool[width * height * 4 * 4, false]
+            .order(ByteOrder.nativeOrder())
+        val floats = data.asFloatBuffer()
+        floats.position(0)
+        floats.limit(width * height * 4)
+
+        GFX.check()
+
+        Texture2D.bindTexture(texture.target, texture.pointer)
+
+        unpackAlignment(width * height * 4)
+        glGetTexImage(texture.target, 0, GL_RGBA, GL_FLOAT, floats)
+
+        floats.position(0)
+
+        // extract data from floats
+        val h = fluidHeight
+        val hu = fluidMomentumX
+        val hv = fluidMomentumY
+        val b = bathymetry
+
+        h.fill(0f)
+        hu.fill(0f)
+        hv.fill(0f)
+        b.fill(0f)
+
+        val stride = width + 2
+        val offset = stride + 1 // (1,1)
+
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val i = (x + y * stride) + offset
+                val j = (x + y * width) * 4
+                h[i] = floats[j]
+                hu[i] = floats[j + 1]
+                hv[i] = floats[j + 2]
+                b[i] = floats[j + 3]
+            }
+        }
+
+        Texture2D.bufferPool.returnBuffer(data)
+
+        setGhostOutflow(width, height, bathymetry)
+
     }
 
     override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
@@ -218,7 +272,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
     override fun supportsTexture(): Boolean = true
 
-    override fun createFluidTexture(w: Int, h: Int, cw: Int, ch: Int): Texture2D {
+    override fun requestFluidTexture(w: Int, h: Int, cw: Int, ch: Int): Texture2D {
         defineTexture(w, h, cw, ch, fluidTexture)
         return fluidTexture
     }

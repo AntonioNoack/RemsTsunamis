@@ -24,8 +24,8 @@ enum class EngineType(val id: Int) {
                 GPU_2PASSES -> TwoPassesEngine(w, h)
                 GPU_SHARED_MEMORY -> SharedMemoryEngine(w, h)
                 GPU_COMPUTE_YX -> ComputeYXEngine(w, h)
-                GPU_COMPUTE_FP16B32 -> Compute16B32Engine(w, h)
-                GPU_COMPUTE_FP16B16 -> Compute16B16Engine(w, h)
+                GPU_COMPUTE_FP16B32 -> Compute16Engine(w, h, false)
+                GPU_COMPUTE_FP16B16 -> Compute16Engine(w, h, true)
             }
         }
     }

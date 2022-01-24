@@ -7,6 +7,7 @@ import me.anno.gpu.texture.GPUFiltering
 import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
+import me.anno.tsunamis.engine.gpu.ComputeEngine.Companion.copyTextureRGBA32F
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.setups.FluidSimSetup
 

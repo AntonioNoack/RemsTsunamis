@@ -286,7 +286,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     var simulationSpeed = 0f
 
     @DebugProperty
-    val stepsPerSecond get() = simulationSpeed / maxTimeStep
+    val stepsPerSecond
+        get() = simulationSpeed / maxTimeStep
 
     @NotSerializedProperty
     var computingThread: Thread? = null
@@ -359,33 +360,63 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     fun ensureFieldSize(): Boolean {
         val w = width
         val h = height
-        var engine = engine
-        return if (engine == null || engine.width != width || engine.height != height || wantsReset) {
+        val oldEngine = engine
+        return if (oldEngine == null || oldEngine.width != width || oldEngine.height != height || wantsReset) {
 
             val setup = setup ?: return false
             if (!setup.isReady()) return false
 
             // reset engine
             // to make it cheaper, we could replace them...
-            engine?.destroy()
-            engine = engineType.create(w, h)
-            this.engine = engine
+            var newEngine = engineType.create(w, h)
+            if (oldEngine != null && newEngine.isCompatible(oldEngine)) {
+                newEngine = oldEngine // we can still use the old engine
+            } else {
+                this.engine = newEngine
+            }
 
             wantsReset = false
             hasValidBathymetryMesh = false
 
+            GFX.check()
+
             try {
-                engine.init(this, setup, gravity)
+                newEngine.init(this, setup, gravity)
             } catch (e: Exception) {
                 // fallback
                 e.printStackTrace()
-                engine = CPUEngine(w, h)
-                this.engine = engine
-                engine.init(this, setup, gravity)
+                newEngine = CPUEngine(w, h)
+                this.engine = newEngine
+                newEngine.init(this, setup, gravity)
             }
+
+            GFX.check()
+
+            // todo setting type to cpu doesn't work & resetting makes it wrong-values-only
+            if (oldEngine != null && oldEngine !== newEngine) {
+                if (newEngine.width == oldEngine.width &&
+                    newEngine.height == oldEngine.height
+                ) {
+                    val w2 = w + 2
+                    val h2 = h + 2
+                    if (oldEngine.supportsTexture()) {
+                        GFX.check()
+                        val fluidData = oldEngine.requestFluidTexture(w2, h2, w2, h2)
+                        GFX.check()
+                        newEngine.setFromTextureRGBA32F(fluidData)
+                        GFX.check()
+                    }
+                }
+                oldEngine.destroy()
+                GFX.check()
+            }
+
+            GFX.check()
 
             timeStepIndex = 0
             maxTimeStep = computeMaxTimeStep()
+
+            GFX.check()
 
             true
         } else true
@@ -592,7 +623,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             mesh.materials = fluidMaterialList
             val material = MaterialCache[fluidMaterialList[0]]
             if (material != null) {
-                val fluidTexture = engine.createFluidTexture(w, h, cw, ch)
+                val fluidTexture = engine.requestFluidTexture(w, h, cw, ch)
                 setMaterialProperties(material, colorMap, cellSize, cw, ch, fluidTexture)
             }
             ensureTriangleCount(mesh, cw, ch)
@@ -744,8 +775,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         if (computeOnly) return
         computingThread?.interrupt()
         computingThread = null
-        engine?.destroy()
-        engine = null
+        wantsReset = true
         invalidateFluid()
         invalidateBathymetryMesh()
     }
@@ -754,10 +784,14 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         if (computeOnly) return
         if (GFX.isGFXThread()) {
             if (useTextureData2) {
+                GFX.check()
                 generateFluidMesh(this)
             }
+            GFX.check()
             invalidateMesh()
+            GFX.check()
             ensureBuffer()
+            GFX.check()
         } else {
             GFX.addGPUTask(1) {
                 invalidateFluid()

@@ -252,6 +252,8 @@ fun main(args: Array<String>) {
             // (load 2*fp16 + fp32 + store 2*fp16), 2 half-steps, for all cells
             EngineType.GPU_COMPUTE_FP16B32 -> ((3 + 2) * 2 + 4) * numIterations * 2 * (width * height).toDouble() / duration / 1e9
             // (load + store), (4 floats each (h,hu,hv,b)), 2 half-steps, for all cells
+            // 4x load + 4x store
+            // 3x load + 4x store
             else -> 2 * 4 * 4 * numIterations * 2 * (width * height).toDouble() / duration / 1e9
         }
 

@@ -64,6 +64,12 @@ object SetupLoader {
         }
     }
 
+    fun load(args: Array<String>): Setup {
+        val ref = if (args.isEmpty()) InvalidRef
+        else FileReference.Companion.getReference(args[0])
+        return load(ref)
+    }
+
     fun load(file: FileReference): Setup {
 
         var setup: FluidSimSetup = NetCDFSetup()

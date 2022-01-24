@@ -28,6 +28,13 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
         halfStep(gravity, scaling, false)
     }
 
+    open fun isCompatible(engine: TsunamiEngine): Boolean {
+        return engine.width == width && engine.height == height &&
+                engine::class == this::class
+    }
+
+    abstract fun setFromTextureRGBA32F(texture: Texture2D)
+
     abstract fun halfStep(gravity: Float, scaling: Float, x: Boolean)
 
     abstract fun supportsAsyncCompute(): Boolean
@@ -79,7 +86,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
         throw RuntimeException("Operation not supported")
     }
 
-    open fun createFluidTexture(
+    open fun requestFluidTexture(
         w: Int, h: Int, cw: Int, ch: Int
     ): Texture2D {
         throw RuntimeException("Operation not supported")

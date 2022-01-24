@@ -10,6 +10,7 @@ import me.anno.gpu.shader.Renderer
 import me.anno.gpu.shader.Shader
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.GPUFiltering
+import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
 import org.lwjgl.opengl.GL11
 
@@ -37,6 +38,10 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
         }
     }
 
+    override fun setFromTextureRGBA32F(texture: Texture2D) {
+        ComputeEngine.copyTextureRGBA32F(texture, this.src.getColor0())
+    }
+
     override fun step(gravity: Float, scaling: Float) {
         GFX.checkIsGFXThread()
         renderPurely {
@@ -60,7 +65,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
         synchronizeGraphics()
     }
 
-    override fun createFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src.getColor0()
+    override fun requestFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src.getColor0()
 
     override fun updateStatistics(sim: FluidSim) {
 
