@@ -10,8 +10,11 @@ import me.anno.tsunamis.Visualisation
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
+import me.anno.utils.pooling.FloatArrayPool
 import org.lwjgl.opengl.GL11C.*
+import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.FloatBuffer
 import kotlin.math.max
 import kotlin.math.min
 
@@ -86,23 +89,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
     override fun setFromTextureRGBA32F(texture: Texture2D) {
 
-        val width = texture.w
-        val height = texture.h
-
-        val data = Texture2D.bufferPool[width * height * 4 * 4, false]
-            .order(ByteOrder.nativeOrder())
-        val floats = data.asFloatBuffer()
-        floats.position(0)
-        floats.limit(width * height * 4)
-
-        GFX.check()
-
-        Texture2D.bindTexture(texture.target, texture.pointer)
-
-        unpackAlignment(width * height * 4)
-        glGetTexImage(texture.target, 0, GL_RGBA, GL_FLOAT, floats)
-
-        floats.position(0)
+        val (floats, data) = getPixels(texture)
 
         // extract data from floats
         val h = fluidHeight
@@ -110,22 +97,22 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         val hv = fluidMomentumY
         val b = bathymetry
 
-        h.fill(0f)
-        hu.fill(0f)
-        hv.fill(0f)
-        b.fill(0f)
+        val width = texture.w
+        val height = texture.h
 
         val stride = width + 2
         val offset = stride + 1 // (1,1)
 
         for (y in 0 until height) {
-            for (x in 0 until width) {
-                val i = (x + y * stride) + offset
-                val j = (x + y * width) * 4
+            val iStart = (y * stride) + offset
+            var j = (y * width) * 4
+            val iEnd = iStart + width
+            for (i in iStart until iEnd) {
                 h[i] = floats[j]
                 hu[i] = floats[j + 1]
                 hv[i] = floats[j + 2]
                 b[i] = floats[j + 3]
+                j += 4
             }
         }
 
@@ -240,19 +227,18 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         return fluidMomentumY[getIndex(x, y)]
     }
 
-    private fun defineTexture(w: Int, h: Int, cw: Int, ch: Int, fluidTexture: Texture2D) {
-        fluidTexture.setSize(cw - 2, ch - 2)
-        val data = createTextureData(w, h, cw, ch, this)
-        fluidTexture.autoUpdateMipmaps = false
-        fluidTexture.createRGBA(data, false)
-    }
-
     override fun computeMaxVelocity(gravity: Float): Float {
         return computeMaxVelocity(width, height, fluidHeight, fluidMomentumX, fluidMomentumY, gravity)
     }
 
     override fun supportsMesh(): Boolean = true
 
+    /**
+     * @param w width with ghost cells
+     * @param h height with ghost cells
+     * @param cw coarse width with ghost cells
+     * @param ch like cw
+     * */
     override fun createFluidMesh(
         w: Int, h: Int,
         cw: Int, ch: Int,
@@ -272,8 +258,13 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
     override fun supportsTexture(): Boolean = true
 
-    override fun requestFluidTexture(w: Int, h: Int, cw: Int, ch: Int): Texture2D {
-        defineTexture(w, h, cw, ch, fluidTexture)
+    override fun requestFluidTexture(cw: Int, ch: Int): Texture2D {
+        fluidTexture.setSize(cw, ch)
+        val buffer = fbPool[fluidTexture.w * fluidTexture.h * 4, false]
+        val data = createTextureData(width + 2, height + 2, cw + 2, ch + 2, this, buffer)
+        fluidTexture.autoUpdateMipmaps = false
+        fluidTexture.createRGBA(data, false)
+        fbPool.returnBuffer(buffer)
         return fluidTexture
     }
 
@@ -284,6 +275,30 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
     }
 
     companion object {
+
+        val fbPool = FloatArrayPool(8, true)
+
+        fun getPixels(texture: Texture2D): Pair<FloatBuffer, ByteBuffer> {
+
+            val width = texture.w
+            val height = texture.h
+
+            val data = Texture2D.bufferPool[width * height * 4 * 4, false]
+                .order(ByteOrder.nativeOrder())
+            val floats = data.asFloatBuffer()
+            floats.position(0)
+            floats.limit(width * height * 4)
+
+            GFX.check()
+
+            Texture2D.bindTexture(texture.target, texture.pointer)
+
+            unpackAlignment(width * height * 4)
+            glGetTexImage(texture.target, 0, GL_RGBA, GL_FLOAT, floats)
+
+            return Pair(floats, data)
+
+        }
 
         fun copy(src: FloatArray, dst: FloatArray = FloatArray(src.size)): FloatArray {
             if (src.size * 4 >= 1_000_000) {

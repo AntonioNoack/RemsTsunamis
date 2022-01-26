@@ -3,7 +3,6 @@ package me.anno.tsunamis
 import me.anno.engine.RemsEngine
 import me.anno.extensions.ExtensionLoader
 import me.anno.extensions.mods.Mod
-import me.anno.gpu.shader.OpenGLShader
 import me.anno.image.Image
 import me.anno.image.ImageCPUCache
 import me.anno.io.ISaveable.Companion.registerCustomClass
@@ -74,6 +73,7 @@ class FluidSimMod : Mod() {
         registerCustomClass(LinearDiscontinuity())
         registerCustomClass(CircularDiscontinuity())
         registerCustomClass(NetCDFSetup())
+        registerCustomClass(GMTTrackSetup())
         registerCustomClass(CriticalFlowSetup())
         registerCustomClass(PoolSetup())
 

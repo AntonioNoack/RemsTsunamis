@@ -1,8 +1,10 @@
 package me.anno.tsunamis.io
 
+import me.anno.image.raw.IFloatImage
 import me.anno.io.files.FileReference
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
+import me.anno.utils.LOGGER
 import me.anno.utils.OS.documents
 import me.anno.utils.Sleep.waitUntil
 import me.anno.utils.hpc.HeavyProcessing.processBalanced
@@ -14,6 +16,7 @@ import kotlin.concurrent.thread
 object NetCDFExport {
 
     private fun removeBorder(width: Int, height: Int, src: FloatArray, dst: FloatArray): FloatArray {
+        if (src.size == dst.size) return src // already done
         processBalanced(0, height, false) { y0, y1 ->
             for (y in y0 until y1) {
                 val srcI0 = (width + 2) * (y + 1) + 1
@@ -27,9 +30,16 @@ object NetCDFExport {
         return dst
     }
 
+    private fun copyChannel(image: IFloatImage, channel: Int, dst: FloatArray) {
+        for (i in dst.indices) {
+            dst[i] = image.getValue(i, channel)
+        }
+    }
+
+    // todo coarsening could be useful for this function
     /**
      * @param sim fluid simulation
-     * @param writeGhostCells whether the ghost cells should be written
+     * @param writeGhostCells whether the ghost cells should be written (if they exist in the engine)
      * @param dst destination file
      * */
     fun export(sim: FluidSim, writeGhostCells: Boolean, dst: FileReference = documents.getChild("fluidSim.nc")) {
@@ -38,12 +48,35 @@ object NetCDFExport {
         val height = sim.height // height without ghost cells
 
         // values
-        // todo request these values as a large chunk of data
-        val engine = sim.engine as CPUEngine
-        val h = engine.fluidHeight
-        val b = engine.bathymetry
-        val hu = engine.fluidMomentumX
-        val hv = engine.fluidMomentumY
+        val engine = sim.engine
+        if (engine == null) {
+            LOGGER.warn("Cannot export data, because engine is null")
+            return
+        }
+
+        val h: FloatArray
+        val b: FloatArray
+        val hu: FloatArray
+        val hv: FloatArray
+        if (engine::class == CPUEngine::class) {
+            engine as CPUEngine
+            h = engine.fluidHeight
+            b = engine.bathymetry
+            hu = engine.fluidMomentumX
+            hv = engine.fluidMomentumY
+        } else {
+            val image = sim.requestFluidData()!!
+            val size = image.width * image.height
+            h = FloatArray(size)
+            b = engine.bathymetry
+            hu = FloatArray(size)
+            hv = FloatArray(size)
+            // copy the data into the other arrays
+            copyChannel(image, 0, h)
+            copyChannel(image, 1, hu)
+            copyChannel(image, 2, hv)
+        }
+
         val setup = sim.setup!!
 
         // is this part thread-safe?

@@ -7,7 +7,6 @@ import me.anno.gpu.texture.GPUFiltering
 import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
-import me.anno.tsunamis.engine.gpu.ComputeEngine.Companion.copyTextureRGBA32F
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.setups.FluidSimSetup
 
@@ -37,8 +36,10 @@ abstract class GPUEngine<Buffer>(
     }
 
     private fun uploadMainBuffer() {
-        val data = createTextureData(width, height, this)
+        val buffer = fbPool[width * height * 4, false]
+        val data = createTextureData(width, height, this, buffer)
         createBuffer(src, data)
+        fbPool.returnBuffer(buffer)
     }
 
     abstract override fun step(gravity: Float, scaling: Float)
@@ -63,21 +64,6 @@ abstract class GPUEngine<Buffer>(
         sim.maxMomentumY = reduced.y*/
     }
 
-    override fun getFluidHeightAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
-
-    override fun getMomentumXAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
-
-    override fun getMomentumYAt(x: Int, y: Int): Float {
-        GFX.checkIsGFXThread()
-        TODO("Not yet implemented")
-    }
-
     override fun computeMaxVelocity(gravity: Float): Float {
         return maxVelocity
     }
@@ -89,21 +75,18 @@ abstract class GPUEngine<Buffer>(
     }
 
     companion object {
-
-        fun initTextures(fb: Framebuffer){
+        fun initTextures(fb: Framebuffer) {
             fb.autoUpdateMipmaps = false
             fb.ensure()
-            for(tex in fb.textures){
+            for (tex in fb.textures) {
                 initTexture(tex)
             }
         }
 
-        fun initTexture(tex: Texture2D){
+        fun initTexture(tex: Texture2D) {
             tex.autoUpdateMipmaps = false
             tex.filtering = GPUFiltering.TRULY_NEAREST
             tex.clamping = Clamping.CLAMP
         }
-
     }
-
 }

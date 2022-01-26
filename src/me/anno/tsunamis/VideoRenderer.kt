@@ -99,7 +99,7 @@ object VideoRenderer {
                 val shader = showWavesShader.value
                 shader.use()
                 shader.v3f("scale", 1f / maxFluidHeight, 1f / maxMomentum, 1f / maxMomentum)
-                engine.requestFluidTexture(w, h, w, h).bind(0)
+                engine.requestFluidTexture(w, h).bind(0)
                 GFX.flat01.draw(shader)
             }
             callback()

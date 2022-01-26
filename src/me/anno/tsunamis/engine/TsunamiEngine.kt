@@ -23,7 +23,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     abstract fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float)
 
-    open fun step(gravity: Float, scaling: Float){
+    open fun step(gravity: Float, scaling: Float) {
         halfStep(gravity, scaling, true)
         halfStep(gravity, scaling, false)
     }
@@ -86,9 +86,13 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
         throw RuntimeException("Operation not supported")
     }
 
-    open fun requestFluidTexture(
-        w: Int, h: Int, cw: Int, ch: Int
-    ): Texture2D {
+    /**
+     * returns the fluid data,
+     * typically without ghost cells
+     * @param cw if coarsening is to be applied (width != cw), this function can do it as well; without ghost cells
+     * @param ch see cw
+     * */
+    open fun requestFluidTexture(cw: Int, ch: Int): Texture2D {
         throw RuntimeException("Operation not supported")
     }
 
@@ -135,6 +139,31 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
     }
 
     companion object {
+
+        fun setGhostOutflow(width: Int, height: Int, v: FloatArray) {
+
+            // set the ghost zone to be outflow conditions
+            for (y in -1..height) {
+                val outside = getIndex(-1, y, width, height)
+                val inside = getIndex(0, y, width, height)
+                v[outside] = v[inside]
+            }
+            for (y in -1..height) {
+                val outside = getIndex(width, y, width, height)
+                val inside = getIndex(width - 1, y, width, height)
+                v[outside] = v[inside]
+            }
+            for (x in -1..width) {
+                val outside = getIndex(x, -1, width, height)
+                val inside = getIndex(x, 0, width, height)
+                v[outside] = v[inside]
+            }
+            for (x in -1..width) {
+                val outside = getIndex(x, height, width, height)
+                val inside = getIndex(x, height - 1, width, height)
+                v[outside] = v[inside]
+            }
+        }
 
         fun getIndex(x: Int, y: Int, width: Int, height: Int): Int {
             val lx = Maths.clamp(x + 1, 0, width + 1)
@@ -185,6 +214,12 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             return if (f < 0f) Maths.mixARGB(neg, zero, f + 1f) else Maths.mixARGB(zero, pos, f)
         }
 
+        /**
+         * @param w width with ghost cells
+         * @param h like w
+         * @param cw coarse width with ghost cells
+         * @param ch like cw
+         * */
         fun createFluidMesh(
             w: Int,
             h: Int,

@@ -3,6 +3,7 @@ package me.anno.tsunamis.engine
 import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.tsunamis.FluidSim
+import me.anno.tsunamis.engine.TsunamiEngine.Companion.setGhostOutflow
 import me.anno.tsunamis.setups.FluidSimSetup
 import me.anno.tsunamis.setups.LinearDiscontinuity
 import org.apache.logging.log4j.LogManager
@@ -256,7 +257,7 @@ object FWaveSolver {
 
     }
 
-    fun testBorder() {
+    private fun testBorder() {
         val w = 100
         val h = 50
         val sim = FluidSim()
@@ -272,19 +273,16 @@ object FWaveSolver {
         ImageWriter.writeImageFloat(w + 2, h + 2, "border.png", false, height)
     }
 
-    fun testOutflow() {
+    private fun testOutflow() {
         val w = 100
         val h = 50
-        val sim = FluidSim()
-        sim.width = w
-        sim.height = h
         val height = FloatArray((w + 2) * (h + 2))
         for (i in height.indices) height[i] = Math.random().toFloat()
-        sim.setGhostOutflow(w, h, height)
+        setGhostOutflow(w, h, height)
         ImageWriter.writeImageFloat(w + 2, h + 2, "outflow.png", false, height)
     }
 
-    fun testNaN() {
+    private fun testNaN() {
         val tmp = FloatArray(4)
         solve(230.46196f, 6.285231E-22f, -55848.68f, -1828.01f, -497.51163f, -127.29645f, 9.81f, tmp)
     }
@@ -317,11 +315,11 @@ object FWaveSolver {
         }
     }
 
-    fun assert(b: Boolean) {
+    private fun assert(b: Boolean) {
         if (!b) throw RuntimeException()
     }
 
-    fun assert(a: Float, b: Float, delta: Float) {
+    private fun assert(a: Float, b: Float, delta: Float) {
         if (abs(a - b) > delta) throw RuntimeException("$a != $b, ${abs(a - b)} > $delta")
     }
 

@@ -10,6 +10,8 @@ import me.anno.io.serialization.SerializedProperty
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.io.NetCDFImageCache.getData
 import me.anno.tsunamis.io.VariableImage
+import me.anno.tsunamis.setups.ShoreLine.toBathymetry
+import me.anno.tsunamis.setups.ShoreLine.toFluidHeight
 import me.anno.utils.Sleep.waitUntil
 import me.anno.utils.hpc.HeavyProcessing.processBalanced
 
@@ -17,11 +19,11 @@ class NetCDFSetup : FluidSimSetup() {
 
     @SerializedProperty
     var bathymetryFile: FileReference =
-        getReference("E:\\Documents\\Uni\\Master\\WS2122/tohoku_gebco08_ucsb3_250m_bath.nc")
+        getReference("E:/Documents/Uni/Master/WS2122/tohoku_gebco08_ucsb3_250m_bath.nc")
 
     @SerializedProperty
     var displacementFile: FileReference =
-        getReference("E:\\Documents\\Uni\\Master\\WS2122/tohoku_gebco08_ucsb3_250m_displ.nc")
+        getReference("E:/Documents/Uni/Master/WS2122/tohoku_gebco08_ucsb3_250m_displ.nc")
 
     @Range(0.0, Double.POSITIVE_INFINITY)
     @SerializedProperty
@@ -40,12 +42,14 @@ class NetCDFSetup : FluidSimSetup() {
     val dataHeight
         get() = getData(bathymetryFile, true)?.height ?: -1
 
+    // todo code preferred cell size
+
     override fun getPreferredNumCellsX(): Int {
-        return getData(bathymetryFile, true)!!.getWidth()
+        return getData(bathymetryFile, false)!!.getWidth()
     }
 
     override fun getPreferredNumCellsY(): Int {
-        return getData(bathymetryFile, true)!!.getHeight()
+        return getData(bathymetryFile, false)!!.getHeight()
     }
 
     override fun isReady(): Boolean {
@@ -82,14 +86,8 @@ class NetCDFSetup : FluidSimSetup() {
         val bathymetryData = getData(bathymetryFile, false)!!
         fillData(w, h, dst, bathymetryData)
         val shoreMax = shoreCliffHeight
-        val shoreMin = -shoreMax
         for (i in dst.indices) {
-            val bathymetry = dst[i]
-            dst[i] = when {
-                bathymetry >= 0f -> 0f // beach / land
-                bathymetry > shoreMin -> shoreMax // cliff zone
-                else -> -bathymetry // ocean
-            }
+            dst[i] = toFluidHeight(dst[i], shoreMax)
         }
     }
 
@@ -99,14 +97,8 @@ class NetCDFSetup : FluidSimSetup() {
         fillData(w, h, dst, bathymetryData)
         val shoreMax = shoreCliffHeight
         if (shoreMax > 0f) {
-            val shoreMin = -shoreMax
             for (i in dst.indices) {
-                val bathymetry = dst[i]
-                dst[i] = when {
-                    bathymetry <= shoreMin || bathymetry >= shoreMax -> bathymetry
-                    bathymetry < 0f -> shoreMin
-                    else -> shoreMax
-                }
+                dst[i] = toBathymetry(dst[i], shoreMax)
             }
         }
         addData(w, h, dst, displacement)
@@ -209,7 +201,7 @@ class NetCDFSetup : FluidSimSetup() {
             val h = setup.dataHeight
             val bath = FloatArray((w + 2) * (h + 2))
             setup.fillBathymetry(w, h, bath)
-            ImageWriter.writeImageFloat(w+2, h+2, "bath.png", true, bath)
+            ImageWriter.writeImageFloat(w + 2, h + 2, "bath.png", true, bath)
         }
 
     }

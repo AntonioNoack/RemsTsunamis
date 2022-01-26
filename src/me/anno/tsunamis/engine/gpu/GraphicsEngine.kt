@@ -65,11 +65,9 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
         synchronizeGraphics()
     }
 
-    override fun requestFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src.getColor0()
+    override fun requestFluidTexture(cw: Int, ch: Int) = src.getColor0()
 
-    override fun updateStatistics(sim: FluidSim) {
-
-    }
+    override fun updateStatistics(sim: FluidSim) {}
 
     override fun destroyBuffer(buffer: Framebuffer) {
         buffer.destroy()

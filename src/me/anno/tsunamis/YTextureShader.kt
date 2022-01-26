@@ -114,8 +114,8 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "int lod = 0;\n" +
                     "#define SURFACE(h) dot(h, heightMask)\n" +
                     "#define SURFACE2(h) dot(h, heightMask) * (h.r > 0.0 ? fluidHeightScale : 1.0)\n" +
-                    "#define COARSE_INDEX_TO_FINE0(x,w,cw) x < 2 || cw <= 4 ? x : cw - x <= 2 ? x + w - cw : 2 + (x-2)*(w-4)/(cw-4)\n" +
-                    "#define COARSE_INDEX_TO_FINE1(x,w,cw) x < 1 || cw <= 2 ? x : cw - x <= 1 ? x + w - cw : 1 + (x-1)*(w-2)/(cw-2)\n" +
+                    // coarse index to fine index, without ghost cells
+                    "#define COARSE_INDEX_TO_FINE1(x,w,cw) w == cw || x < 1 || cw <= 2 ? x : cw - x <= 1 ? x + w - cw : 1 + (x-1)*(w-2)/(cw-2)\n" +
                     "ivec2 fieldSize = textureSize(${if (halfPrecision) "fluidSurface" else "fluidData"}, lod);\n" +
                     "int instanceId = int(gl_InstanceID);\n" +
                     "int cellIndex  = instanceId >> 1;\n" +

@@ -84,14 +84,16 @@ object GLSLSolver {
 
     fun createTextureData(
         w: Int, h: Int,
-        engine: CPUEngine
+        engine: CPUEngine,
+        data: FloatArray
     ): FloatArray {
         return createTextureData(
             w, h,
             engine.fluidHeight,
             engine.fluidMomentumX,
             engine.fluidMomentumY,
-            engine.bathymetry
+            engine.bathymetry,
+            data
         )
     }
 
@@ -100,9 +102,10 @@ object GLSLSolver {
         fluidHeight: FloatArray,
         momentumX: FloatArray,
         momentumY: FloatArray,
-        bathymetry: FloatArray
+        bathymetry: FloatArray,
+        data: FloatArray
     ): FloatArray {
-        val data = FloatArray(w * h * 4)
+        if (data.size != w * h * 4) throw IllegalArgumentException()
         for (y in 0 until h) {
             var srcIndex = TsunamiEngine.getIndex(0, y, w, h)
             var dstIndex = (y * w) * 4
@@ -117,42 +120,93 @@ object GLSLSolver {
         return data
     }
 
-
+    /**
+     * @param w width with ghost cells
+     * @param h height with ghost cells
+     * @param cw coarse width with ghost cells
+     * @param ch coarse height with ghost cells
+     * @return data of the inner, coarsened field
+     * */
     fun createTextureData(
         w: Int, h: Int,
         cw: Int, ch: Int,
-        engine: CPUEngine
+        engine: CPUEngine,
+        dst: FloatArray
     ): FloatArray {
         return createTextureData(
             w, h, cw, ch,
             engine.fluidHeight,
             engine.fluidMomentumX,
             engine.fluidMomentumY,
-            engine.bathymetry
+            engine.bathymetry,
+            dst
         )
     }
 
+    /**
+     * struct of arrays -> array of structs,
+     * with ghost cells -> without ghost cells
+     * @param w width with ghost cells
+     * @param h height with ghost cells
+     * @param cw coarse width with ghost cells
+     * @param ch coarse height with ghost cells
+     * @return data of the inner, coarsened field
+     * */
     fun createTextureData(
         w: Int, h: Int,
         cw: Int, ch: Int,
         fluidHeight: FloatArray,
         fluidMomentumX: FloatArray,
         fluidMomentumY: FloatArray,
-        bathymetry: FloatArray
+        bathymetry: FloatArray,
+        dst: FloatArray
     ): FloatArray {
-        val data = FloatArray((cw - 2) * (ch - 2) * 4)
-        var j = 0
-        for (y in 1 until ch - 1) {
-            for (x in 1 until cw - 1) {
-                val k = FluidSim.coarseIndexToFine(w, h, cw, ch, x + y * cw)
-                data[j + 0] = fluidHeight[k]
-                data[j + 1] = fluidMomentumX[k]
-                data[j + 2] = fluidMomentumY[k]
-                data[j + 3] = bathymetry[k]
-                j += 4
+        val destSize = (cw - 2) * (ch - 2) * 4
+        if (dst.size < destSize) {
+            throw RuntimeException("Destination buffer not large enough, ${dst.size} < $destSize = ($cw-2)*($ch-2)*4")
+        }
+        val sourceSize = w * h
+        if (fluidHeight.size < sourceSize ||
+            fluidMomentumX.size < sourceSize ||
+            fluidMomentumY.size < sourceSize ||
+            bathymetry.size < sourceSize
+        ) {
+            throw IndexOutOfBoundsException(
+                "Not enough data! $w x $h needs $sourceSize cells, " +
+                        "got (" +
+                        "${fluidHeight.size}, " +
+                        "${fluidMomentumX.size}, " +
+                        "${fluidMomentumY.size}, " +
+                        "${bathymetry.size})"
+            )
+        }
+        if(cw == w && ch == h){
+            var j = 0
+            for (y in 1 until ch - 1) {
+                var index = 1 + y * cw
+                for (x in 1 until cw - 1) {
+                    dst[j++] = fluidHeight[index]
+                    dst[j++] = fluidMomentumX[index]
+                    dst[j++] = fluidMomentumY[index]
+                    dst[j++] = bathymetry[index]
+                    index++
+                }
+            }
+        } else {
+            var j = 0
+            for (y in 1 until ch - 1) {
+                var coarseIndex = 1 + y * cw
+                for (x in 1 until cw - 1) {
+                    val fineIndex = FluidSim.coarseIndexToFine(w, h, cw, ch, coarseIndex)
+                    dst[j++] = fluidHeight[fineIndex]
+                    dst[j++] = fluidMomentumX[fineIndex]
+                    dst[j++] = fluidMomentumY[fineIndex]
+                    dst[j++] = bathymetry[fineIndex]
+                    coarseIndex++
+                }
             }
         }
-        return data
+        return dst
     }
 
 }

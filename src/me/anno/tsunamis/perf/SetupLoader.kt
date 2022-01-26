@@ -1,6 +1,5 @@
 package me.anno.tsunamis.perf
 
-import me.anno.io.csv.CSVReader
 import me.anno.io.files.FileReference
 import me.anno.io.files.InvalidRef
 import me.anno.io.yaml.YAMLNode
@@ -163,15 +162,36 @@ object SetupLoader {
                     if (setupFile == InvalidRef) throw RuntimeException("Missing parameter setupFile for GMT track data")
                     if (!setupFile.exists) throw RuntimeException("Could not find $setupFile")
                     if (setupFile.isDirectory) throw RuntimeException("Setup file must be a file, not a directory")
-                    val data = CSVReader.readNumerical(setupFile.readText(), ',', '\n', 0.0)
-                    val xs = data["track_location"] ?: throw RuntimeException("Missing column track_location")
-                    val ba = data["height"] ?: throw RuntimeException("Missing column height for bathymetry data")
-                    if (xs.size != ba.size) throw RuntimeException("Columns have different length")
-                    cellSizeMeters = (xs.last() - xs.first()).toFloat() / (xs.size - 1f) / scale
-                    width = (xs.size * scale - 2).toInt() // 2 ghost cells
+                    setup = GMTTrackSetup()
+                    setup.sourceFile = setupFile
+                    cellSizeMeters = setup.getPreferredCellSizeMeters()
+                    width = ((setup.getPreferredNumCellsX() + 2) * scale - 2).toInt() // 2 ghost cells
                     height = 1
-                    TODO("Setup type hasn't been implemented")
                 }
+                "Critical" -> {
+                    setup = CriticalFlowSetup()
+                    setup.shallowDepth = config.getOrDefault("shallowDepth", setup.shallowDepth)
+                    setup.baseDepth = config.getOrDefault("baseDepth", setup.baseDepth)
+                    setup.momentumX = config.getOrDefault("momentumX", setup.momentumX)
+                    setup.bowWidth = config.getOrDefault("bowWidth", setup.bowWidth)
+                    setup.bowPower = config.getOrDefault("bowPower", setup.bowPower)
+                }
+                "Subcritical", "SubcriticalFlow", "SubcriticalFlow1d" -> {
+                    setup = CriticalFlowSetup()
+                    setup.shallowDepth = config.getOrDefault("shallowDepth", 1.8f)
+                    setup.baseDepth = config.getOrDefault("baseDepth", 2f)
+                    setup.momentumX = config.getOrDefault("momentumX", 4.42f)
+                    setup.bowWidth = config.getOrDefault("bowWidth", 0.2f)
+                    setup.bowPower = config.getOrDefault("bowPower", 2f)
+                }
+                "Supercritical", "SupercriticalFlow", "SupercriticalFlow1d" -> {setup = CriticalFlowSetup()
+                    setup.shallowDepth = config.getOrDefault("shallowDepth", 0.13f)
+                    setup.baseDepth = config.getOrDefault("baseDepth", 0.33f)
+                    setup.momentumX = config.getOrDefault("momentumX", 0.18f)
+                    setup.bowWidth = config.getOrDefault("bowWidth", 0.2f)
+                    setup.bowPower = config.getOrDefault("bowPower", 2f)
+                }
+                // a checkpoint could be used as well...
                 null -> { /* fine, use default */
                 }
                 else -> throw RuntimeException("Invalid setup type $type")

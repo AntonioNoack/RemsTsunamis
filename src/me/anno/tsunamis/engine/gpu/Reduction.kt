@@ -92,6 +92,7 @@ object Reduction {
         }
 
         // read pixel
+        // todo: are these barriers necessary, or is it ok to read directly?
         GL42C.glMemoryBarrier(GL42C.GL_ALL_BARRIER_BITS)
         GL11C.glFlush(); GL11C.glFinish() // wait for everything to be drawn
         buffer.position(0)

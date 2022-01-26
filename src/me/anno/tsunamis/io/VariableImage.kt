@@ -61,7 +61,7 @@ class VariableImage(variable: Variable) : Image(
     private val hm2 = height - 2f
 
     private val colorMap = LinearColorMap(
-        1f / max(1e-38f, max(max, -min)),
+        min, max,
         LinearColorMap.negInfColor,
         0x0055ff or black, // blue
         0xffffff or black, // white

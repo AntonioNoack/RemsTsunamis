@@ -12,9 +12,14 @@ import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.engine.raycast.Raycast
 import me.anno.engine.ui.render.RenderView
 import me.anno.gpu.GFX
+import me.anno.gpu.framebuffer.FBStack
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.Texture2D
+import me.anno.image.raw.CompositeFloatImage
+import me.anno.image.raw.FloatBufferImage
+import me.anno.image.raw.FloatImage
+import me.anno.image.raw.IFloatImage
 import me.anno.input.Input
 import me.anno.io.files.FileReference
 import me.anno.io.files.FileReference.Companion.getReference
@@ -26,9 +31,11 @@ import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.mix
 import me.anno.tsunamis.draw.Drawing
 import me.anno.tsunamis.engine.CPUEngine
+import me.anno.tsunamis.engine.CPUEngine.Companion.getPixels
 import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.engine.TsunamiEngine
 import me.anno.tsunamis.engine.gpu.Compute16Engine
+import me.anno.tsunamis.engine.gpu.ComputeEngine.Companion.scaleTextureRGBA32F
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFExport
 import me.anno.tsunamis.setups.FluidSimSetup
@@ -47,10 +54,9 @@ import kotlin.concurrent.thread
 import kotlin.math.max
 import kotlin.math.min
 
-// todo at the end of the tsunami scenario, there seems to be a wall even without wall enabled...
-
 /**
  * simple 3d mesh, which simulates water
+ * // todo bug: if is cpu solver, ghost cells are displayed / sent to the gpu, it seems
  * */
 @ExecuteInEditMode
 class FluidSim : ProceduralMesh, CustomEditMode {
@@ -189,7 +195,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @SerializedProperty
     var timeFactor = 1f
 
-    @Group("Time")
+    @Group("Controls")
     @SerializedProperty
     var isPaused = false
         set(value) {
@@ -247,7 +253,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     @DebugAction
     @DebugTitle("Export as NetCDF")
-    @Suppress("UNUSED")
     fun exportNetCDF() {
         // export the current state as NetCDF
         // todo we could ask the user to enter a path
@@ -398,14 +403,16 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 if (newEngine.width == oldEngine.width &&
                     newEngine.height == oldEngine.height
                 ) {
-                    val w2 = w + 2
-                    val h2 = h + 2
-                    if (oldEngine.supportsTexture()) {
-                        GFX.check()
-                        val fluidData = oldEngine.requestFluidTexture(w2, h2, w2, h2)
-                        GFX.check()
-                        newEngine.setFromTextureRGBA32F(fluidData)
-                        GFX.check()
+                    try {
+                        if (oldEngine.supportsTexture()) {
+                            GFX.check()
+                            val fluidData = oldEngine.requestFluidTexture(w, h)
+                            GFX.check()
+                            newEngine.setFromTextureRGBA32F(fluidData)
+                            GFX.check()
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
                 oldEngine.destroy()
@@ -532,6 +539,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         } else maxVisualizedValue
     }
 
+    /**
+     * @param cw coarse width without ghost cells
+     * @param ch coarse height without ghost cells
+     * */
     private fun setMaterialProperties(
         material: Material,
         colorMap: ColorMap?,
@@ -558,8 +569,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         // when culling is enabled, this won't be a problem anyways
         val dz = if (flipBathymetryNormal) cellSize / 100f else 0f
         val cellOffset = Vector3f(
-            -(cw - 2) * 0.5f * cellSize, dz,
-            -(ch - 2) * 0.5f * cellSize
+            -cw * 0.5f * cellSize, dz,
+            -ch * 0.5f * cellSize
         )
         material["cellOffset"] = TypeValue(GLSLType.V3F, cellOffset)
         material["visualization"] = TypeValue(GLSLType.V1I, visualization.id)
@@ -575,13 +586,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         )
         material["heightMask"] = TypeValue(GLSLType.V4F, Vector4f(1f, 0f, 0f, 1f))
         material["fluidHeightScale"] = TypeValue(GLSLType.V1F, fluidHeightScale)
-        material["coarseSize"] = TypeValue(GLSLType.V2I, Vector2i(cw - 2, ch - 2))
+        material["coarseSize"] = TypeValue(GLSLType.V2I, Vector2i(cw, ch))
         material["nearestNeighborColors"] = TypeValue(GLSLType.BOOL, nearestNeighborColors)
     }
 
     // todo separate color map for bathymetry & fluid
-
     // todo nearest neighbor colors for bathymetry & meshes in general (?)
+
     @Group("Visuals")
     @SerializedProperty
     var nearestNeighborColors = false
@@ -593,18 +604,33 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             }
         }
 
+    /**
+     * @param cw coarse width without ghost cells
+     * @param ch coarse height without ghost cells
+     * */
     private fun ensureTriangleCount(mesh: ProceduralMesh, cw: Int, ch: Int) {
         val mesh2 = mesh.mesh2
-        val targetSize = (cw - 3) * (ch - 3) * 2
+        val targetSize = (cw - 1) * (ch - 1) * 2
         if (mesh2.proceduralLength != targetSize) {
             mesh2.proceduralLength = targetSize
-            mesh2.positions = f12
-            mesh2.normals = f0
-            mesh2.color0 = i0
+            // set the bounding box positions, so it is clickable
+            val x = width * 0.5f * cellSizeMeters
+            val z = height * 0.5f * cellSizeMeters
+            mesh2.positions = floatArrayOf(
+                -x, 0f, -z,
+                -x, 0f, +z,
+                +x, 0f, -z,
+                +x, 0f, +z,
+            )
+            mesh2.indices = intArrayOf(
+                0, 1, 2, 2, 3, 0,
+                0, 2, 1, 2, 0, 2
+            )
+            mesh2.normals = null
+            mesh2.color0 = null
             invalidateMesh()
         }
         // todo it would be cool if we had a rough mesh on the cpu, and a fine one on the gpu
-        // todo we should set the bounding box positions, so it is clickable
     }
 
     private fun generateFluidMesh(mesh: ProceduralMesh) {
@@ -612,10 +638,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val cellSizeMeters = cellSizeMeters
         val colorMap = ColorMap.read(colorMap, false)
         val scale = max(1, coarsening)
-        val w = width + 2
-        val h = height + 2
-        val cw = ceilDiv(w, scale)
-        val ch = ceilDiv(h, scale)
+        val w = width
+        val h = height
+        val cw = ceilDiv(width, scale)
+        val ch = ceilDiv(height, scale)
         findVisualScale()
         val cellSize = getCellSize(cellSizeMeters, w, cw)
         if (useTextureData2) {
@@ -629,7 +655,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                     material["fluidMomentumY"] = TypeValue(GLSLType.S2D, engine.momentumY)
                     material["fluidBathymetry"] = TypeValue(GLSLType.S2D, engine.bathymetryTex)
                 } else {
-                    val fluidTexture = engine.requestFluidTexture(w, h, cw, ch)
+                    val fluidTexture = engine.requestFluidTexture(cw, ch)
                     material["fluidData"] = TypeValue(GLSLType.S2D, fluidTexture)
                 }
                 setMaterialProperties(material, colorMap, cellSize, cw, ch)
@@ -639,7 +665,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             mesh.materials = emptyList()
             mesh.mesh2.proceduralLength = 0
             engine.createFluidMesh(
-                w, h, cw, ch, cellSize, scale, fluidHeightScale,
+                w + 2, h + 2, cw + 2, ch + 2, cellSize, scale, fluidHeightScale,
                 visualization, colorMap, colorMapScale, maxVisualizedValueInternally, mesh
             )
         }
@@ -704,31 +730,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val engine = engine ?: return
         engine.step(gravity, scaling)
         if (synchronize) engine.synchronize()
-    }
-
-    fun setGhostOutflow(width: Int, height: Int, v: FloatArray) {
-
-        // set the ghost zone to be outflow conditions
-        for (y in -1..height) {
-            val outside = getIndex(-1, y)
-            val inside = getIndex(0, y)
-            v[outside] = v[inside]
-        }
-        for (y in -1..height) {
-            val outside = getIndex(width, y)
-            val inside = getIndex(width - 1, y)
-            v[outside] = v[inside]
-        }
-        for (x in -1..width) {
-            val outside = getIndex(x, -1)
-            val inside = getIndex(x, 0)
-            v[outside] = v[inside]
-        }
-        for (x in -1..width) {
-            val outside = getIndex(x, height)
-            val inside = getIndex(x, height - 1)
-            v[outside] = v[inside]
-        }
     }
 
     fun computeMaxTimeStep(): Float {
@@ -925,12 +926,66 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     val fluidMaterialList32 by lazy { createMaterials(false) }
     // val solidMaterialList by lazy { createMaterials() }
 
+    fun isApprox(a: Int, b: Int, threshold: Float = 1.05f): Boolean {
+        return min(a, b) * threshold >= max(a, b)
+    }
+
+    /**
+     * you can request this data once every n frames to adjust fluid game mechanics
+     * @param mustBeCopy forces a full copy of the data, only applies to CPUEngine, as the others have to be copied anyways
+     * @return resulting data with the channels (fluid height, momentum x, momentum y, bathymetry), without ghost cells, or null if engine is null
+     * */
+    fun requestFluidData(w: Int = width, h: Int = height, mustBeCopy: Boolean = false): IFloatImage? {
+        val engine = engine ?: return null
+        val width = engine.width
+        val height = engine.height
+        // todo better filtering (or at least options for that)
+        return when (engine::class) {
+            CPUEngine::class -> {
+                engine as CPUEngine
+                if (mustBeCopy || !isApprox(w, width) || !isApprox(h, height)) {
+                    val newData = FloatArray(w * h * 4)
+                    val fh = engine.fluidHeight
+                    val hu = engine.fluidMomentumX
+                    val hv = engine.fluidMomentumY
+                    val ba = engine.bathymetry
+                    for (coarseIndex in 0 until w * h) {
+                        val fineIndex = coarseIndexToFine(width, height, w, h, coarseIndex)
+                        val i4 = coarseIndex * 4
+                        newData[i4] = fh[fineIndex]
+                        newData[i4 + 1] = hu[fineIndex]
+                        newData[i4 + 2] = hv[fineIndex]
+                        newData[i4 + 3] = ba[fineIndex]
+                    }
+                    FloatImage(w, h, 4, newData)
+                } else {
+                    // includes ghost cells, which might cause slight issues...
+                    // you can set mustBeCopy to prevent that
+                    CompositeFloatImage(
+                        width + 2, height + 2,
+                        arrayOf(engine.fluidHeight, engine.fluidMomentumX, engine.fluidMomentumY, engine.bathymetry),
+                    )
+                }
+            }
+            else -> {
+                val tex = engine.requestFluidTexture(w, h)
+                val tex2 = if (tex.w > w || tex.h > h) {
+                    val buffer = FBStack["fluidSim", w, h, 4, true, 1, false]
+                    buffer.ensure()
+                    scaleTextureRGBA32F(tex, buffer.getColor0())
+                } else tex
+                // get the pixels from the image
+                val (pixels, _) = getPixels(tex2)
+                FloatBufferImage(tex2.w, tex2.h, 4, pixels)
+            }
+        }
+    }
+
     companion object {
 
-        // todo check coast-condition for errors
-
         /**
-         * scales down an index from a coarse grid to a fine grid, preserves the border
+         * scales down a 1d index from a coarse grid to a fine grid, preserves the border;
+         * w and cw include the ghost cells
          * */
         fun coarseIndexToFine(x: Int, w: Int, cw: Int): Int {
             return when {
@@ -941,8 +996,16 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             }
         }
 
+        /**
+         * scales down a 2d index from a coarse grid to a fine grid, preserves the border;
+         * w and cw include the ghost cells
+         * @param w width with ghost cells
+         * @param h height with ghost cells
+         * @param cw coarse width with ghost cells
+         * @param ch coarse height with ghost cells
+         * */
         fun coarseIndexToFine(w: Int, h: Int, cw: Int, ch: Int, i: Int): Int {
-            return if (cw == w) {
+            return if (cw == w && ch == h) {
                 i
             } else {
                 val x = i % cw
@@ -969,8 +1032,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         private val defaultColorMap = getReference("res://colormaps/globe.xml")
         private val LOGGER = LogManager.getLogger(FluidSim::class)
         val f0 = FloatArray(0)
-        val i0 = IntArray(0)
-        val f12 = FloatArray(12)
 
     }
 

@@ -77,9 +77,11 @@ class Compute16Engine(
         maxVelocity = super.computeMaxVelocity(gravity)
         if (sim != null) super.updateStatistics(sim)
 
-        val data = GLSLSolver.createTextureData(width, height, this)
+        val buffer = fbPool[width * height * 4, false]
+        val data = GLSLSolver.createTextureData(width, height, this, buffer)
         initTexture(rendered)
         rendered.createRGBA(data, false)
+        fbPool.returnBuffer(buffer)
 
         for (tex in listOf(
             surface0,
@@ -156,9 +158,10 @@ class Compute16Engine(
         synchronizeGraphics()
     }
 
-    override fun requestFluidTexture(w: Int, h: Int, cw: Int, ch: Int): Texture2D {
+    override fun requestFluidTexture(cw: Int, ch: Int): Texture2D {
         GFX.checkIsGFXThread()
-        // todo this step could reduce the resolution for faster rendering
+        // this step could reduce the resolution for faster rendering
+        // (but that probably is not necessary, as a slow pc will have trouble computing the sim as well)
         if (hasChanged) {
             // render partial data into rendered
             val shader = shaders.mergeShader

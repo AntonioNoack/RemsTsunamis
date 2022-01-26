@@ -7,7 +7,8 @@ import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.draw.Drawing
 import me.anno.tsunamis.engine.gpu.GraphicsEngine.Companion.synchronizeGraphics
 import org.joml.Vector2i
-import org.lwjgl.opengl.GL42C.*
+import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
+import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
 open class ComputeEngine(width: Int, height: Int) :
     GPUEngine<Texture2D>(width, height, { createTexture(it, width, height) }) {
@@ -50,11 +51,40 @@ open class ComputeEngine(width: Int, height: Int) :
         synchronizeGraphics()
     }
 
-    override fun requestFluidTexture(w: Int, h: Int, cw: Int, ch: Int) = src
+    override fun requestFluidTexture(cw: Int, ch: Int) = src
 
     companion object {
 
-        fun copyTextureRGBA32F(src: Texture2D, dst: Texture2D) {
+        private val scaleShader by lazy {
+            ComputeShader(
+                "scale-down", Vector2i(16), "" +
+                        "layout(rgba32f, binding = 0) uniform image2D src;\n" +
+                        "layout(rgba32f, binding = 1) uniform image2D dst;\n" +
+                        "uniform ivec2 outSize;\n" +
+                        "uniform vec2 scale;\n" +
+                        "void main(){\n" +
+                        "   ivec2 uvOut = ivec2(gl_GlobalInvocationID.xy);\n" +
+                        "   if(uvOut.x < outSize.x && uvOut.y < outSize.y){\n" +
+                        "       ivec2 uvIn = ivec2(vec2(uvOut) * scale);\n" +
+                        "       imageStore(dst, uvOut, imageLoad(src, uvIn));\n" +
+                        "   }\n" +
+                        "}"
+            )
+        }
+
+        fun scaleTextureRGBA32F(src: Texture2D, dst: Texture2D): Texture2D {
+            val shader = scaleShader
+            shader.use()
+            shader.v2f("scale", src.w.toFloat() / dst.w.toFloat(), src.h.toFloat() / dst.h.toFloat())
+            shader.v2i("outSize", dst.w, dst.h)
+            ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
+            ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            shader.runBySize(dst.w, dst.h)
+            GFX.check()
+            return dst
+        }
+
+        fun copyTextureRGBA32F(src: Texture2D, dst: Texture2D): Texture2D {
             if (src.w != dst.w || src.h != dst.h) throw IllegalArgumentException("Textures must have same size")
             val shader = Drawing.rgbaShaders.copyShader
             shader.use()
@@ -64,6 +94,7 @@ open class ComputeEngine(width: Int, height: Int) :
             ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
             shader.runBySize(src.w, src.h)
             GFX.check()
+            return dst
         }
 
         fun createTexture(name: String, width: Int, height: Int): Texture2D {

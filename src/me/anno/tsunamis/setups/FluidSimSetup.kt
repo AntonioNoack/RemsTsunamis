@@ -11,6 +11,8 @@ open class FluidSimSetup : Component() {
 
     open fun isReady(): Boolean = true
 
+    open fun getPreferredCellSizeMeters(): Float = 1f
+
     open fun getPreferredNumCellsX(): Int = 10
 
     open fun getPreferredNumCellsY(): Int = 10

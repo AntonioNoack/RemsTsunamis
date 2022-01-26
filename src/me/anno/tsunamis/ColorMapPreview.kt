@@ -5,15 +5,14 @@ import me.anno.gpu.drawing.DrawRectangles.drawRect
 import me.anno.gpu.drawing.DrawTexts.drawSimpleTextCharByChar
 import me.anno.gpu.drawing.DrawTexts.monospaceFont
 import me.anno.image.colormap.LinearColorMap
-import me.anno.maths.Maths
 import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.mix
 import me.anno.tsunamis.io.ColorMap
 import me.anno.ui.base.Panel
 import me.anno.ui.base.constraints.AxisAlignment
 import me.anno.ui.style.Style
-import kotlin.math.max
-import kotlin.math.min
+import java.text.DecimalFormat
+import kotlin.math.*
 
 class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
 
@@ -64,14 +63,17 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
         val xe = xs + stripeW + padding // where the text starts
         val offset = -font.sampleHeight / 2 // center the text vertically on top / bottom
         val numNumbers = clamp((ye - ys) / (2 * font.sampleHeight), 2, 5)
+        // todo make all numbers the same length, align their commas
+        // round value to a reasonable number of digits
+        // find whether we need an exponent
+        // val absMax = max(abs(minValue), abs(maxValue))
+        // val needsExponent = absMax < 1e-2f || absMax > 1e7f
+        // val digits = if (needsExponent) 1 else floor(log10(absMax)).toInt() + 1
+        // val commaDigits = 7 - digits
         for (i in 0 until numNumbers) {
             val v = i / (numNumbers - 1f)
-            // todo round value to a reasonable number of digits
-            // todo make all numbers the same length (?), align their commas
-            var text = mix(maxValue, minValue, v).toString()
-            if (text.endsWith(".0")) text = text.substring(0, text.length - 2)
-            if (!text.startsWith('-')) text = "+$text"
-            val y = mix(ys-1, ye, v)
+            val text = mix(maxValue, minValue, v).toString()
+            val y = mix(ys - 1, ye, v)
             drawSimpleTextCharByChar(xe, y + offset, 0, text, AxisAlignment.MIN)
             // draw a small stripe to show where exactly the number belongs to
             drawRect(xe - padding, y, padding / 2, 1, black)
@@ -81,7 +83,7 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
     companion object {
 
         // todo we should centralize all indicator colors
-        val linColorMap = LinearColorMap(0x0055ff or black, -1, 0xff0000 or black)
+        private val linColorMap = LinearColorMap(0x0055ff or black, -1, 0xff0000 or black)
             .clone(-1f, 1f)
 
     }
