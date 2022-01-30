@@ -8,10 +8,9 @@ import me.anno.image.colormap.LinearColorMap
 import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.mix
 import me.anno.tsunamis.io.ColorMap
-import me.anno.ui.base.Panel
+import me.anno.ui.Panel
 import me.anno.ui.base.constraints.AxisAlignment
 import me.anno.ui.style.Style
-import java.text.DecimalFormat
 import kotlin.math.*
 
 class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
