@@ -1,8 +1,5 @@
 # Project Plan
 
-// todo stations
-// todo color scale
-
 ## Integration into Rem's Engine
 *until 10.01.2022, CPU compute*
 
@@ -92,7 +89,7 @@ Another task:
 
 *presentation maybe 02.02. (wednesday), 10:00*
 
-- [ ] measure performance
-- [ ] measure bandwidth
-- [ ] compare them to the CPU implementation in C++
-- [ ] integrate the "best" solution into the FluidSim component for real time visualization? (if it's not CUDA)
+- [x] measure performance
+- [x] measure bandwidth
+- [x] compare them to the CPU implementation in C++
+- [x] integrate the "best" solution into the FluidSim component for real time visualization

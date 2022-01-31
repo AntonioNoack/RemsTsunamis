@@ -64,7 +64,7 @@ DDR4 3200: 25.6 GB/s (but it should be dual channel, so x2?)
 Theoretical GPU performance: 6.2 TFlops, 256 GB/s
 
 
-On Tesla P100, 16GB
+On Tesla P100, 16GB (without 7/8-correction for bandwidth, without correction for two-passes)
 9.3 TFlops, 732 or 549GB/s bandwidth
 
 [09:18:30,INFO:ComputeShader] Max compute group count: 2147483647 x 65535 x 65535
@@ -95,7 +95,7 @@ On Tesla P100, 16GB
 [09:19:56,INFO:Performance] 9.979 s, 1271.56 GFlop/s (408.64x, 0.58x, 1.17x, 2.39x, 1.10x, 18.14x, 1.02x), 144.50 GB/s
 
 
-RX 580 again, more gpu solver variants
+RX 580 again, more gpu solver variants (without 7/8 correction, without correction for two-passes)
 
 [12:06:19,INFO:Performance] CPU, 16 iterations
 [12:06:29,INFO:Performance] 9.884 s, 18.46 GFlop/s, 6.71 GB/s
@@ -247,6 +247,8 @@ fun main(args: Array<String>) {
         val gigaFlops = flops / duration * 1e-9
 
         val bandwidth = when (type) {
+            // (3x load + 2x store), (4 floats each (h,hu,hv,b)), 2 half-steps, for all cells
+            EngineType.GPU_2PASSES -> (3 + 2) * 4 * 4 * numIterations * 2 * (width * height).toDouble() / duration / 1e9
             // (load 3*fp16 + store 2*fp16), 2 half-steps, for all cells
             EngineType.GPU_COMPUTE_FP16B16 -> (3 + 2) * 2 * numIterations * 2 * (width * height).toDouble() / duration / 1e9
             // (load 2*fp16 + fp32 + store 2*fp16), 2 half-steps, for all cells
