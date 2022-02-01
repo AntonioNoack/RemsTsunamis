@@ -8,6 +8,7 @@ import me.anno.image.ImageCPUCache
 import me.anno.io.ISaveable.Companion.registerCustomClass
 import me.anno.io.files.FileReference
 import me.anno.io.files.Signature
+import me.anno.io.utils.StringMap
 import me.anno.io.zip.ZipCache
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFCache
@@ -89,6 +90,7 @@ class FluidSimMod : Mod() {
         @JvmStatic
         fun main(args: Array<String>) {
             ExtensionLoader.loadMainInfo()
+            registerCustomClass(StringMap())
             // print all shaders
             // OpenGLShader.logShaders = true
             RemsEngine().run()

@@ -16,7 +16,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-@Suppress("UNUSED")
+@Suppress("unused")
 abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     var bathymetry: FloatArray = f0

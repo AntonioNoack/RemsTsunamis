@@ -47,7 +47,7 @@ import me.anno.ui.style.Style
 import me.anno.utils.ShutdownException
 import me.anno.utils.hpc.ProcessingGroup
 import me.anno.utils.hpc.ThreadLocal2
-import me.anno.utils.types.Lists.firstInstanceOrNull
+import me.anno.utils.structures.lists.Lists.firstInstanceOrNull
 import org.apache.logging.log4j.LogManager
 import org.joml.*
 import kotlin.concurrent.thread
@@ -421,6 +421,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
             GFX.check()
 
+            invalidateFluid()
+            invalidateBathymetryMesh()
+
             timeStepIndex = 0
             maxTimeStep = computeMaxTimeStep()
 
@@ -539,6 +542,15 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         } else maxVisualizedValue
     }
 
+    @SerializedProperty
+    var fluidHalfTransparent = true
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateFluid()
+            }
+        }
+
     /**
      * @param cw coarse width without ghost cells
      * @param ch coarse height without ghost cells
@@ -576,6 +588,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         material["visualization"] = TypeValue(GLSLType.V1I, visualization.id)
         val visScale = 1f / max(1e-38f, maxVisualizedValueInternally)
         material["visScale"] = TypeValue(GLSLType.V1F, visScale)
+        material["halfTransparent"] = TypeValue(GLSLType.BOOL, fluidHalfTransparent)
         material["visualMask"] = TypeValue(
             GLSLType.V4F,
             when (visualization) {
@@ -773,10 +786,12 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     }
 
     @Group("Drawing")
+    @Range(0.0, 1e10)
     @SerializedProperty
     var brushSize = 30f * 250f
 
     @Group("Drawing")
+    @Range(0.0, 1e10)
     @SerializedProperty
     var brushStrength = 5f
 

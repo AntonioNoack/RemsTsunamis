@@ -154,8 +154,6 @@ I created two versions: one with FP16 and one with FP32 bathymetry.
 
 ## Performance Results
 
-// todo: run stream benchmark on RX 580 & Tesla P100?
-
 The field for the different processors mean how much time a full time step on a 10800 x 6000 field required. The lower, the better.
 
 | Engine Type           | RX 580 8 GB | Ryzen 5 2600 | Tesla P100 16 GB | 2x Xeon Gold 6140 |
@@ -171,10 +169,11 @@ The field for the different processors mean how much time a full time step on a 
 | FP16, FP16 Bathymetry |    0.0110 s |            - |         0.0090 s |                 - |
 
 The following bandwidth numbers are not what is theoretically needed, but what the machine uses internally. This allows for
-a guess on "hardware utilisation", so indirectly on synchronization bottlenecks. It uses the same 10800 x 6000 field.
+a guess on "hardware utilisation". It uses the same 10800 x 6000 field.
 
-It also assumes, that the GLSL code is executed as-is, without optimizations. For the Tesla P100 on the graphics pipeline,
-there must be optimizations, because the calculated bandwidth is slightly higher than the theoretical maximum (732 GB/s).
+It also assumes, that the GLSL code is executed as-is, without optimizations.
+I additionally assume that each pixel is only loaded once from a texture,
+so if a kernel run requests multiple pixels from a texture, I assume that the neighbor pixels were stored in caches.
 
 | Engine Type           | RX 580 8 GB | Ryzen 5 2600 | Tesla P100 16 GB | 2x Xeon Gold 6140 |
 |-----------------------|------------:|-------------:|-----------------:|------------------:|
@@ -188,9 +187,15 @@ there must be optimizations, because the calculated bandwidth is slightly higher
 | FP16, FP32 Bathymetry | 155.32 GB/s |            - |      198.28 GB/s |                 - |
 | FP16, FP16 Bathymetry | 118.26 GB/s |            - |      144.50 GB/s |                 - |
 
+For the Tesla P100 on the graphics pipeline,
+there must be some optimizations, because the calculated theoretical maximum bandwidth is 732 GB/s.
+My shader supposedly loads and stores up to 803 GB/s using the Graphics pipeline.
+A bandwidth optimization would possible, because the shader uses fewer data (h, hu, b) than what is actually requested (h, hu, hv, b).
+This reduces the probable, actual bandwidth to ~700 GB/s, because only three input components are used, four are written.
+
 
 For my RX 580 this means that it was probably memory-bandwidth limited.
-The Tesla P100 had unknown issues with the compute pipeline.
+The Tesla P100 had unknown issues with the Compute pipeline.
 
 The best performance was achieved on the P100 using the graphics pipeline.
 It was 12x faster than the dual 18 core Xeon Gold processors.

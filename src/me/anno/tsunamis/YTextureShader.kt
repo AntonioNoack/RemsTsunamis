@@ -191,11 +191,13 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
             Variable(GLSLType.V2F, "colorMapScale"),
             Variable(GLSLType.V4F, "visualMask"),
             Variable(GLSLType.V1F, "visScale"),
-            Variable(GLSLType.V1I, "visualization")
+            Variable(GLSLType.V1I, "visualization"),
+            Variable(GLSLType.BOOL, "halfTransparent")
         )
 
         return ShaderStage(
             "material", fragmentVariables, "" +
+                    "if(halfTransparent && (int(gl_FragCoord.x + gl_FragCoord.y) & 1) == 0) discard;\n" +
                     "if(dot(vec4(finalPosition, 1.0), reflectionCullingPlane) < 0.0) discard;\n" +
 
                     // step by step define all material properties
