@@ -542,6 +542,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         } else maxVisualizedValue
     }
 
+    @Group("Visuals")
     @SerializedProperty
     var fluidHalfTransparent = true
         set(value) {

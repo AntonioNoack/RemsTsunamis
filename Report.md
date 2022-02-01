@@ -1,6 +1,10 @@
 # Report
 
-This is a report about what the extension implements and what the performance results were.
+This is a report about what the extension implements, how it can be used, and what the performance results were.
+
+## Build the extension & engine
+
+For building instructions, please refer to the [README.md](https://github.com/AntonioNoack/RemsTsunamis).
 
 ## Creating an extension
 
@@ -16,6 +20,38 @@ which it will be lower.
 
 Since 24.01.2022, these kernels work on all solver/engine types.
 
+## Simulating large fields with visualization
+
+There are three factors, which limit the number of computed iterations per displayed frame:
+"Compute Budget FPS", "Time Factor" and "Max Iterations Per Frame".
+
+"Compute Budget FPS" cancels more iterations, when the time spent invoking them is above 1/this limit.
+
+"Time Factor" cancels more iterations, and the length of the last timestep,
+if a timestep would simulate more time than the length of the previously displayed frame took to compute (times Time Factor).
+
+So in theory, a "Time Factor" of 60 would simulate a minute of progress every second, if the solver is fast enough.
+
+
+To run large simulations on GPU engines, and visualize them at the same time, it is recommended to enable synchronization, so
+the engine on the CPU side can measure the cost of the invoked GPU operations. An alternative is to set the property "maxIterationsPerFrame" of the solver.
+
+If synchronization is disabled, the cost of rendering commands will be underestimated, because the actual execution of these commands is asynchronous.
+
+## Visualizations
+
+There are four visualization modes currently implemented: x-momentum, y-momentum, momentum (L2 norm), water-surface height, and height map.
+Height map will display the height map of the bathymetry data. The scale of that color map is defined as "Color Map Scale".
+All other types display dynamic simulation data, and the scale of the color map can be controlled using "Max Visualized Value".
+
+Water surface will assume that the default water height is zero, and will color water above zero red, and water below blue.
+
+## Bathymetry Visualization
+
+Bathymetry is currently defined as a static (not changing) procedural mesh. It's vertices will be set by the CPU, and then sent to the GPU using [vertex buffer objects](https://www.khronos.org/opengl/wiki/Vertex_Specification).
+To visualize bathymetry within the engine, a second procedural mesh needs to be added, because I wanted to keep fluid and bathymetry separated.
+
+For this, add a "Manual Procedural Mesh" to your entity, and link (via drag & drop) it to the property "Bathymetry Mesh" of your "Fluid Sim" component.
 
 ## Setups
 
@@ -150,6 +186,10 @@ This problem was solved by storing the surface height instead of the full water 
 
 I created two versions: one with FP16 and one with FP32 bathymetry.
 
+## Transferring data from one engine to another
+
+To transfer data between engines, all engines implement functions to read and write their data from/to a OpenGL texture. This is very similar to checkpointing, except here it is run on the GPU.
+
 
 ## Performance Results
 
@@ -176,8 +216,8 @@ so if a kernel run requests multiple pixels from a texture, I assume that the ne
 
 | Engine Type           | RX 580 8 GB | Ryzen 5 2600 | Tesla P100 16 GB | 2x Xeon Gold 6140 |
 |-----------------------|------------:|-------------:|-----------------:|------------------:|
-| CPU / C++             |           - |   13.42 GB/s |                - |        62.09 GB/s |
-| CPU / Kotlin          |           - |    6.71 GB/s |                - |        16.51 GB/s |
+| CPU / C++             |           - |    8.37 GB/s |                - |        38.73 GB/s |
+| CPU / Kotlin          |           - |    4.19 GB/s |                - |        10.30 GB/s |
 | Graphics              | 168.79 GB/s |            - |      803.04 GB/s |                 - |
 | Compute Default       | 180.67 GB/s |            - |      395.92 GB/s |                 - |
 | Two Passes            | 189.82 GB/s |            - |      484.08 GB/s |                 - |
@@ -192,12 +232,31 @@ My shader supposedly loads and stores up to 803 GB/s using the Graphics pipeline
 A bandwidth optimization would possible, because the shader uses fewer data (h, hu, b) than what is actually requested (h, hu, hv, b).
 This reduces the probable, actual bandwidth to ~700 GB/s, because only three input components are used, four are written.
 
+### Memory Bandwidth calculations
+
+The following memory access patterns all describe a half-step (update in a single dimension).
+
+For CPU types, 3 floats (4 bytes per float) being loaded, and 2 floats being stored was assumed.
+
+For the first two GPU types, shared memory engine, and engine with yx-access pattern, in the shader 4 floats were loaded (h,hu,hv,b), and 4 floats then were stored (h,hu,hv,b).
+
+In the engine type with two passes, 4 floats are loaded in the first pass, 4 are stored, then in the second, 4 are loaded, and 4 will be stored again.
+
+For the FP16 types, the information is loaded and stored as half precision floats (2 bytes per half float). The type with FP32 loads single precision (4 bytes per float) bathymetry data.
+The FP16 types only store height and the component of the momentum, that was changed (h,hu for x-axis / h,hv for y-axis).
+
+## Short Analysis
 
 For my RX 580 this means that it was probably memory-bandwidth limited.
-The Tesla P100 had unknown issues with the Compute pipeline.
+The Tesla P100 had unknown issues with the Compute pipeline, but may be bandwidth limited as well.
 
 The best performance was achieved on the P100 using the graphics pipeline.
 It was 12x faster than the dual 18 core Xeon Gold processors.
+
+The Xeon and Ryzen processors would probably have been faster, if the compiler used SIMD instructions.
+With AVX512 instructions, the Xeon processor would be up to 16x than currently without them, so in total, it might win again.
+
+For visualization, I prefer the GPU solvers, because they already are on the GPU, so no huge GPU-CPU memory transfers need to be regularly executed.
 
 ## Graphics Pipeline VS Compute Pipeline - Ease of implementation
 
