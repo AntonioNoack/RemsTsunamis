@@ -1,20 +1,11 @@
 # Report
 
-This is a report about what the extension implements, some things that caused issues, and what the performance results were.
+This is a report about what the extension implements and what the performance results were.
 
 ## Creating an extension
 
 To create the extension was [relatively simple](https://github.com/AntonioNoack/RemsStudio/wiki/Creating-Custom-Extensions), and to translate the existing C++ code to Java as well.
 If I were to use native libraries, I would have to compile them for all target architectures (Windows x64, Windows x86, Windows ARM, Linux ARM32, Linux ARM64, MacOS, maybe Android) of the engine.
-
-A first hindrance of the project was that sometimes, the NetCDF data failed to load, and it crashed somewhere.
-The solution was that Rem's Engine is parallelized in a lot of places, and the Java library for NetCDF is not thread-safe.
-So I created a mutex, and always lock it, when I need to call the library.
-
-When I created the mode to draw waves in real-time, I had the issue that it was extremely laggy, and the engine froze when the user was drawing.
-The cause of that issue was that mouse-motion events were used, and they are captured & processed, no matter how many per frame.
-Before an update was completely processed, the next event would be registered for processing.
-The solution to that was to add a timeout to applying steps.
 
 
 ## Drawing displacements
@@ -25,9 +16,11 @@ which it will be lower.
 
 Since 24.01.2022, these kernels work on all solver/engine types.
 
+
 ## Setups
 
 Just like C++, I implemented multiple setup types for the simulations.
+
 
 ### Dam Break Setups
 
@@ -54,6 +47,7 @@ The extensions can read these files as well, and uses the CSV Reader of Rem's En
 
 As a first tsunami test, a pool with artificial displacement was used in C++. This setup can be re-created using the PoolSetup class.
 
+
 ### NetCDF Setups
 
 To load NetCDF files, I used the [official NetCDF library](https://www.unidata.ucar.edu/software/netcdf-java/).
@@ -61,6 +55,7 @@ I load them asynchronously to the main thread, so they don't cause too big lag s
 The actual raw data is stored within the class VariableImage, which is then used by the setup class NetCDFSetup.
 
 Additionally to reading NetCDF files, they also can be exported from the editor of the game engine (there is a button for it).
+
 
 ## Color Maps & File Previews
 
@@ -92,11 +87,6 @@ The GPU was detected as "Tesla P100-PCIE-16GB/PCIe/SSE2".
 Before I got it running, I also tested on gpu01.inf-ra.uni-jena.de (RTX 2070 Super), gpu02 (GTX 780), gpu03 (GTX 780) via SSH sessions.
 
 
-## First Measurements - a small mistake
-
-While all measurements look rather slow, the GPU with compute is currently upto 1000x faster than Kotlin.
-Then I noticed that I forgot to set the scene size, and the test was only running on a 10x10 field.
-
 ## Engine types
 
 The extension abstracts the engine, which applies the cell updates to the field broadly. This allows different kinds of solvers to be switched on the fly within the extension.
@@ -119,6 +109,10 @@ this communication again.
 From the graphics pipeline, you only can write to a single pixel (storage cell) at once from a kernel.
 Because of that, the shader computes the update from the left (top) and right (bottom) cell edge, and then writes the updated value to the result framebuffer (writable 2d memory within OpenGL).
 
+To visualize the CPU engines, the underlying triangle mesh is updated after every update/frame. For the GPU engines, 
+the mesh is generated on the GPU in the Vertex shader stage of the graphics pipeline. This has the advantage of reduced CPU-GPU communication,
+but also the issue that click-testing within the engine is currently done on the CPU side, so the fluid cannot be clicked directly, or the engine would need to fetch the data from the GPU for that case.
+
 ### GPU Compute Engine
 
 The compute pipeline of OpenGL allows for more advanced memory accesses, e.g., shared memory. It has the disadvantage from a graphics perspective, that you cannot use the hardware rasterizer and tesselator.
@@ -127,21 +121,25 @@ My first compute engine uses fundamentally the same principles as the graphics e
 Behind the scenes, they probably are pretty much the same. In the graphics pipeline, the functions have more advanced features like mipmapping, interpolation, anisotropic filtering, blending and swizzle masks.
 In the engine however, we use none of those.
 
+
 ### Two Passes Engine (Compute)
 
 As I have described, the previous GPU solvers computed all updates on the edges twice: two updates per cell.
 The two-passes engine tries to optimize this by writing the updates to a texture, and reading them in a second pass.
 This has the advantage of lower computational effort, but the disadvantage of more required memory bandwidth (e.g. the edge-updates to be stored to memory temporarily).
 
+
 ### Shared Memory Engine (Compute)
 
 This additional bandwidth from the two-passes-solver can be removed by splitting the kernel itself with a group-wide barrier.
 Each 16x16 (workers) group computes 16x16 edge updates, and therefore can compute the values of 16x15 (or 15x16) cells.
 
+
 ### YX Engine (Compute)
 
 All compute engines had way worse performance on the Tesla P100 than with the graphics pipeline. It might have been that the stride was suboptimal, so
 I tried to change the addressing of the compute cells. The results were even worse than previously.
+
 
 ### Compute FP16 Engines (Compute)
 
@@ -151,6 +149,7 @@ FP16 would not be enough to store detailed waves with a surface height of 5m in 
 This problem was solved by storing the surface height instead of the full water depth.
 
 I created two versions: one with FP16 and one with FP32 bathymetry.
+
 
 ## Performance Results
 
@@ -207,3 +206,4 @@ it's hard to generally use the compute pipeline.
 
 The main core is thanks to GLSL the same, so only loading, storing, and where the computation takes place differs.
 The compute pipeline offers more advanced features, but they may not be needed in every scenario.
+
