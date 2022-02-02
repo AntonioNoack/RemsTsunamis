@@ -5,6 +5,7 @@ import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.length
 import me.anno.maths.Maths.mix
+import me.anno.tsunamis.FluidSim
 import org.joml.Vector2f.lengthSquared
 import kotlin.math.max
 
@@ -52,7 +53,9 @@ class CircularDiscontinuitySetup : FluidSimSetup {
     }
 
     override fun fillBathymetry(w: Int, h: Int, dst: FloatArray) {
-        dst.fill(-heightOuter)
+        FluidSim.threadPool.processBalanced(0, dst.size, 65536) { i0, i1 ->
+            dst.fill(-heightOuter, i0, i1)
+        }
     }
 
     override fun clone() = CircularDiscontinuitySetup(this)

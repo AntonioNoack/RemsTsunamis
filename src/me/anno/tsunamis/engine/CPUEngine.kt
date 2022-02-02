@@ -6,6 +6,7 @@ import me.anno.gpu.texture.Texture2D
 import me.anno.gpu.texture.Texture2D.Companion.unpackAlignment
 import me.anno.io.serialization.NotSerializedProperty
 import me.anno.tsunamis.FluidSim
+import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.Visualisation
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.io.ColorMap
@@ -103,16 +104,18 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         val stride = width + 2
         val offset = stride + 1 // (1,1)
 
-        for (y in 0 until height) {
-            val iStart = (y * stride) + offset
-            var j = (y * width) * 4
-            val iEnd = iStart + width
-            for (i in iStart until iEnd) {
-                h[i] = floats[j]
-                hu[i] = floats[j + 1]
-                hv[i] = floats[j + 2]
-                b[i] = floats[j + 3]
-                j += 4
+        threadPool.processBalanced(0, height, false) { y0, y1 ->
+            for (y in y0 until y1) {
+                val iStart = (y * stride) + offset
+                var j = (y * width) * 4
+                val iEnd = iStart + width
+                for (i in iStart until iEnd) {
+                    h[i] = floats[j]
+                    hu[i] = floats[j + 1]
+                    hv[i] = floats[j + 2]
+                    b[i] = floats[j + 3]
+                    j += 4
+                }
             }
         }
 

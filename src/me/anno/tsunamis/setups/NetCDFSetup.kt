@@ -11,7 +11,6 @@ import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.io.NetCDFImageCache.getData
 import me.anno.tsunamis.io.VariableImage
 import me.anno.tsunamis.setups.ShoreLine.toBathymetry
-import me.anno.tsunamis.setups.ShoreLine.toFluidHeight
 import me.anno.utils.Sleep.waitUntil
 import me.anno.utils.hpc.HeavyProcessing.processBalanced
 
@@ -86,8 +85,10 @@ class NetCDFSetup : FluidSimSetup() {
         val bathymetryData = getData(bathymetryFile, false)!!
         fillData(w, h, dst, bathymetryData)
         val shoreMax = shoreCliffHeight
-        for (i in dst.indices) {
-            dst[i] = toFluidHeight(dst[i], shoreMax)
+        threadPool.processBalanced(0, dst.size, 65536) { i0, i1 ->
+            for (i in i0 until i1) {
+                dst[i] = toBathymetry(dst[i], shoreMax)
+            }
         }
     }
 
@@ -97,8 +98,10 @@ class NetCDFSetup : FluidSimSetup() {
         fillData(w, h, dst, bathymetryData)
         val shoreMax = shoreCliffHeight
         if (shoreMax > 0f) {
-            for (i in dst.indices) {
-                dst[i] = toBathymetry(dst[i], shoreMax)
+            threadPool.processBalanced(0, dst.size, 65536) { i0, i1 ->
+                for (i in i0 until i1) {
+                    dst[i] = toBathymetry(dst[i], shoreMax)
+                }
             }
         }
         addData(w, h, dst, displacement)

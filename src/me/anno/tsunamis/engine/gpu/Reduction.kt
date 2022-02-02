@@ -47,7 +47,7 @@ object Reduction {
 
     private val shaderByType = HashMap<Operation, ComputeShader>()
 
-    fun reduce(texture: Texture2D, op: Operation): Vector4f {
+    fun reduce(texture: Texture2D, op: Operation, dst: Vector4f = Vector4f()): Vector4f {
 
         val shader = shaderByType.getOrPut(op) {
             ComputeShader(
@@ -74,21 +74,21 @@ object Reduction {
             )
         }
 
-        var src = texture
-        while (src.w > reduction || src.h > reduction) {
+        var srcTexture = texture
+        while (srcTexture.w > reduction || srcTexture.h > reduction) {
             // reduce
             shader.use()
-            val w = ceilDiv(src.w, reduction)
-            val h = ceilDiv(src.h, reduction)
-            val dstBuffer = FBStack["red", w, h, TargetType.FloatTarget4, 1, false]
-            dstBuffer.ensure()
-            val dst = dstBuffer.getColor0()
-            shader.v2i("inSize", src.w, src.h)
+            val w = ceilDiv(srcTexture.w, reduction)
+            val h = ceilDiv(srcTexture.h, reduction)
+            val dstFramebuffer = FBStack["red", w, h, TargetType.FloatTarget4, 1, false]
+            dstFramebuffer.ensure()
+            val dstTexture = dstFramebuffer.getColor0()
+            shader.v2i("inSize", srcTexture.w, srcTexture.h)
             shader.v2i("outSize", w, h)
-            ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
-            ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            ComputeShader.bindTexture(0, srcTexture, ComputeTextureMode.READ)
+            ComputeShader.bindTexture(1, dstTexture, ComputeTextureMode.WRITE)
             shader.runBySize(w, h)
-            src = dst
+            srcTexture = dstTexture
         }
 
         // read pixel
@@ -96,11 +96,11 @@ object Reduction {
         GL42C.glMemoryBarrier(GL42C.GL_ALL_BARRIER_BITS)
         GL11C.glFlush(); GL11C.glFinish() // wait for everything to be drawn
         buffer.position(0)
-        src.bind(0)
-        GL11C.glGetTexImage(src.target, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT, buffer)
+        srcTexture.bind(0)
+        GL11C.glGetTexImage(srcTexture.target, 0, GL11C.GL_RGBA, GL11C.GL_FLOAT, buffer)
         GFX.check()
 
-        return Vector4f(buffer[0], buffer[1], buffer[2], buffer[3])
+        return dst.set(buffer[0], buffer[1], buffer[2], buffer[3])
     }
 
 }

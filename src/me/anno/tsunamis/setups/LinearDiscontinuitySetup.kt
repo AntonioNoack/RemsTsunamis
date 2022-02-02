@@ -2,6 +2,7 @@ package me.anno.tsunamis.setups
 
 import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.io.serialization.SerializedProperty
+import me.anno.tsunamis.FluidSim
 import kotlin.math.max
 
 class LinearDiscontinuitySetup : FluidSimSetup {
@@ -44,7 +45,9 @@ class LinearDiscontinuitySetup : FluidSimSetup {
     }
 
     override fun fillMomentumY(w: Int, h: Int, dst: FloatArray) {
-        dst.fill(0f)
+        FluidSim.threadPool.processBalanced(0, dst.size, 65536) { i0, i1 ->
+            dst.fill(0f, i0, i1)
+        }
     }
 
     override fun clone() = LinearDiscontinuitySetup(this)
