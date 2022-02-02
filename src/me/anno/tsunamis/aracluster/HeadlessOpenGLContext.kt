@@ -41,7 +41,8 @@ object HeadlessOpenGLContext {
 
     // https://github.com/NVIDIA-developer-blog/code-samples/blob/master/posts/egl_OpenGl_without_Xserver/tinyegl.cc
     /**
-     * creates an OpenGL context, which does not require an X11 server
+     * Creates an OpenGL context, which theoretically does not require an X11 server.
+     * Don't forget to login into SSH with the option -X!
      * */
     fun createContext(width: Int = 512, height: Int = width, useDefaultDisplay: Boolean) {
 
@@ -52,15 +53,11 @@ object HeadlessOpenGLContext {
 
         check()
 
+        // use default display might not work everywhere
         if (useDefaultDisplay) {
-            // gpu02: works, GTX 780
-            // login.fmi: EGL init failed
-            // ara gpu_test: EGL init failed
             display = eglGetDisplay(EGL_DEFAULT_DISPLAY)
             check()
         } else {
-            // login.fmi.uni-jena.de: failed to get EGL display
-            // ara gpu_test: no EGL devices found
             val maxDevices = 16
             val devices = PointerBuffer.allocateDirect(maxDevices)
             val numDevices = IntArray(1)

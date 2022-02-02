@@ -5,7 +5,7 @@ import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.setGhostOutflow
 import me.anno.tsunamis.setups.FluidSimSetup
-import me.anno.tsunamis.setups.LinearDiscontinuity
+import me.anno.tsunamis.setups.LinearDiscontinuitySetup
 import org.apache.logging.log4j.LogManager
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -263,7 +263,7 @@ object FWaveSolver {
         val sim = FluidSim()
         sim.width = w
         sim.height = h
-        val setup = LinearDiscontinuity()
+        val setup = LinearDiscontinuitySetup()
         setup.heightLeft = 0.2f
         setup.heightRight = 0.8f
         setup.borderHeight = 1.0f
@@ -291,7 +291,7 @@ object FWaveSolver {
         val sim = FluidSim()
         sim.width = 100
         sim.height = 1
-        val setup = LinearDiscontinuity()
+        val setup = LinearDiscontinuitySetup()
         setup.heightLeft = 10f
         setup.heightRight = 8f
         setup.hasBorder = false

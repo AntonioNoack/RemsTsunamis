@@ -71,8 +71,8 @@ class FluidSimMod : Mod() {
 
         // register components
         registerCustomClass(FluidSim())
-        registerCustomClass(LinearDiscontinuity())
-        registerCustomClass(CircularDiscontinuity())
+        registerCustomClass(LinearDiscontinuitySetup())
+        registerCustomClass(CircularDiscontinuitySetup())
         registerCustomClass(NetCDFSetup())
         registerCustomClass(GMTTrackSetup())
         registerCustomClass(CriticalFlowSetup())
@@ -82,8 +82,10 @@ class FluidSimMod : Mod() {
 
     override fun onExit() {
         super.onExit()
-        for (signature in netCDFSignatures)
-            Signature.unregister(signature)
+        for (s in netCDFSignatures)
+            Signature.unregister(s)
+        for (s in colorMapSignatures)
+            Signature.unregister(s)
     }
 
     companion object {

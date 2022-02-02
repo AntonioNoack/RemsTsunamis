@@ -43,7 +43,7 @@ class CriticalFlowSetup : FluidSimSetup() {
         get() {
             // could be changed by the simulation itself; we don't really have access to the gravity here
             val gravity = 9.81f
-            return momentumX / sqrt(gravity * min(shallowDepth, baseDepth))
+            return abs(momentumX) / sqrt(gravity * min(shallowDepth, baseDepth))
         }
 
     override fun getPreferredNumCellsX() = 200

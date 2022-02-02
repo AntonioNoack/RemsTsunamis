@@ -14,31 +14,36 @@ If I were to use native libraries, I would have to compile them for all target a
 
 ## Drawing displacements
 
-The extension allows the user to hand-draw tsunamis for testing. It is currently implemented as linear sections,
+The extension allows the user to hand-draw tsunamis for testing. It is currently implemented as linear line segments (with a width),
 which are applied as kernel functions. The drawing direction defines in which direction the fluid will be higher, and in
 which it will be lower.
+The drawing mode has to be enabled with the button "Toggle Edit Mode". When the mode is active, a colored (currently green) rectangle will be drawn around the button.
 
-Since 24.01.2022, these kernels work on all solver/engine types.
+These kernels work on all solver/engine types.
 
-## Simulating large fields with visualization
+
+## Limiting iterations per frame
 
 There are three factors, which limit the number of computed iterations per displayed frame:
 "Compute Budget FPS", "Time Factor" and "Max Iterations Per Frame".
 
-"Compute Budget FPS" cancels more iterations, when the time spent invoking them is above 1/this limit.
+"Compute Budget FPS" cancels more iterations, when the time spent invoking them is above 1/"Compute Budget FPS".
 
-"Time Factor" cancels more iterations, and the length of the last timestep,
-if a timestep would simulate more time than the length of the previously displayed frame took to compute (times Time Factor).
+"Time Factor" cancels more iterations, and the length of the last time step,
+if a time step would simulate more time than the length of the previously displayed frame took to compute (times "Time Factor").
 
-So in theory, a "Time Factor" of 60 would simulate a minute of progress every second, if the solver is fast enough.
+The idea of "Time Factor" is that, e.g. a value of 60 would simulate a minute of progress every second, if the solver is fast enough.
 
+## Simulating large fields with visualization
 
 To run large simulations on GPU engines, and visualize them at the same time, it is recommended to enable synchronization, so
-the engine on the CPU side can measure the cost of the invoked GPU operations. An alternative is to set the property "maxIterationsPerFrame" of the solver.
+the engine on the CPU side can measure the cost of the invoked GPU operations.
+Synchronization can be toggled within the properties of the "Tsunami Sim" instance.
+An alternative is to set the property "maxIterationsPerFrame" of the solver.
 
 If synchronization is disabled, the cost of rendering commands will be underestimated, because the actual execution of these commands is asynchronous.
 
-## Visualizations
+## Visualization Modes
 
 There are four visualization modes currently implemented: x-momentum, y-momentum, momentum (L2 norm), water-surface height, and height map.
 Height map will display the height map of the bathymetry data. The scale of that color map is defined as "Color Map Scale".
@@ -53,14 +58,25 @@ To visualize bathymetry within the engine, a second procedural mesh needs to be 
 
 For this, add a "Manual Procedural Mesh" to your entity, and link (via drag & drop) it to the property "Bathymetry Mesh" of your "Fluid Sim" component.
 
+## Video Renderer
+
+Additionally to the engine extension, and the performance tester, the object *VideoRenderer* contains an application that can render a simulation
+into a video using the internal video editor project.
+The video studio project itself uses FFMPEG. FFMPEG needs to be installed manually on Linux. It can be downloaded for Windows by the *me.anno.installer.Installer* object within Rem's Engine.
+
+The visualization style for the *VideoRenderer* currently cannot be changed, but customizing it would be relatively easy: modify the shader on the top of the file.
+
+The setup can be customized using the same YAML settings as for the performance measurements.
+
 ## Setups
 
-Just like C++, I implemented multiple setup types for the simulations.
+Just like C++, I implemented multiple setup types for the simulations. All setup types allow reflective boundary conditions by 
+increasing the bathymetry at the borders.
 
 
 ### Dam Break Setups
 
-Dambreak setups of different kinds are joined in the classes LinearDiscontinuity and CircularDiscontinuity.
+Dam break setups of different kinds are joined in the classes *LinearDiscontinuity* and *CircularDiscontinuity*.
 In the C++ side, I added a rectangle, which can have different height, to test the capabilities of the solver.
 In this extension, this extra rectangle hasn't been implemented.
 
@@ -68,20 +84,22 @@ In this extension, this extra rectangle hasn't been implemented.
 ### Critical Setups
 
 Both sub-critical and super-critical setup types share a common mathematical formula, so they are implemented together in
-CriticalFlowSetup. Additionally, the shape can be influenced using the "power" parameter, which was 2 (polynomial of 2nd degree) in
+*CriticalFlowSetup*. Additionally, the shape can be influenced using the "power" parameter, which was 2 (polynomial of 2nd degree) in
 the C++ experiments.
-
+In the inspector, the Froude number is computed in real-time, when any parameter is changed.
 
 ### GMT Track Setup
 
 The first tsunami type, that was explored in the Tsunami Lab module was an artificial sine-shaped tsunami.
 It was a one-dimensional track from the coast near Tohoku towards the ocean, and extracted using GMT.
-The extensions can read these files as well, and uses the CSV Reader of Rem's Engine, that I originally added for tests for the "Big Data" module.
+The extensions can read these files as well, and uses the CSV Reader of Rem's Engine, that I originally added for tests 
+for the "Big Data" module.
 
 
 ### Tsunami in a Pool
 
-As a first tsunami test, a pool with artificial displacement was used in C++. This setup can be re-created using the PoolSetup class.
+As a first tsunami test, a pool with artificial displacement was used in C++. This setup can be re-created using the *PoolSetup* class.
+*PoolSetup* additionally allows to set a custom size for the displacement.
 
 
 ### NetCDF Setups
@@ -110,6 +128,25 @@ a custom JSON file format with pointers.
 
 However, you can use YAML configuration files like on the C++ side to define a scenario to be simulated.
 This scenario can be either performance-measured using Performance.kt or a video can be created using the VideoRenderer object.
+
+The loading of YAML files is implemented in SetupLoader.kt.
+Some parameters are the same as within C++, some are a little different.
+
+The following lines are a sample configuration for a dam break scenario.
+```yaml
+setup: DamBreak
+hl: 10
+hr: 5
+hul: 1
+hur: 1
+bl: -1
+br: -2
+nx: 100
+ny: 5
+egl: true
+```
+In the sample, the height left/right is set to 10m/5m, the initial momentum is set to +1 on both sides, the bathymetry is set to -1/-2 on the left/rigth side.
+In the three last lines, the field size is set to 100 x 5 inner cells, and that EGL should be used instead of GLFW.
 
 
 ## Running Rem's Engine on the ARA cluster
@@ -151,7 +188,7 @@ but also the issue that click-testing within the engine is currently done on the
 
 ### GPU Compute Engine
 
-The compute pipeline of OpenGL allows for more advanced memory accesses, e.g., shared memory. It has the disadvantage from a graphics perspective, that you cannot use the hardware rasterizer and tesselator.
+The Compute pipeline of OpenGL allows for more advanced memory accesses, e.g., shared memory. It has the disadvantage from a graphics perspective, that you cannot use the hardware rasterizer and tesselator.
 
 My first compute engine uses fundamentally the same principles as the graphics engine, just loading and storing uses functions with different names.
 Behind the scenes, they probably are pretty much the same. In the graphics pipeline, the functions have more advanced features like mipmapping, interpolation, anisotropic filtering, blending and swizzle masks.
@@ -160,7 +197,7 @@ In the engine however, we use none of those.
 
 ### Two Passes Engine (Compute)
 
-As I have described, the previous GPU solvers computed all updates on the edges twice: two updates per cell.
+The previous GPU solvers computed all updates on the edges twice: two updates per cell.
 The two-passes engine tries to optimize this by writing the updates to a texture, and reading them in a second pass.
 This has the advantage of lower computational effort, but the disadvantage of more required memory bandwidth (e.g. the edge-updates to be stored to memory temporarily).
 
@@ -247,7 +284,7 @@ The FP16 types only store height and the component of the momentum, that was cha
 
 ## Short Analysis
 
-For my RX 580 this means that it was probably memory-bandwidth limited.
+For the Radeon RX 580 this means that it was probably memory-bandwidth limited.
 The Tesla P100 had unknown issues with the Compute pipeline, but may be bandwidth limited as well.
 
 The best performance was achieved on the P100 using the graphics pipeline.
@@ -261,8 +298,13 @@ For visualization, I prefer the GPU solvers, because they already are on the GPU
 ## Graphics Pipeline VS Compute Pipeline - Ease of implementation
 
 Since on my GPU there is no performance difference, and on the Tesla P100, the graphics pipeline currently is twice as fast, 
-it's hard to generally use the compute pipeline.
+it's hard to generally use the Compute pipeline.
 
 The main core is thanks to GLSL the same, so only loading, storing, and where the computation takes place differs.
-The compute pipeline offers more advanced features, but they may not be needed in every scenario.
+The Compute pipeline offers more advanced features, but they may not be needed in every scenario.
 
+## Future Optimizations
+
+Most engines write copy bathymetry and the other component (y/x for x/y-axis) of the momentum.
+Optimizing this would mean less bandwidth, and when the tested GPUs are indeed memory limited, this would improve performance further.
+These optimizations would not improve the results for the FP16 engines, as they already use this approach.

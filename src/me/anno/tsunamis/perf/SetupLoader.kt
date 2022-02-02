@@ -118,7 +118,7 @@ object SetupLoader {
 
             when (val type = config["setup"]?.value) {
                 "DamBreak1d", "DamBreak" -> {
-                    setup = LinearDiscontinuity()
+                    setup = LinearDiscontinuitySetup()
                     setup.heightLeft = config.getOrDefault("hl", setup.heightLeft)
                     setup.heightRight = config.getOrDefault("hr", setup.heightRight)
                     setup.impulseLeft = config.getOrDefault("hul", setup.impulseLeft)
@@ -128,7 +128,7 @@ object SetupLoader {
                 }
                 "DamBreak2d", "DamBreakCircle" -> {
                     // l_heightLeft, l_heightRight, l_splitPositionX, l_splitPositionY, l_damRadius, l_damBathymetry
-                    setup = CircularDiscontinuity()
+                    setup = CircularDiscontinuitySetup()
                     setup.heightInner = config.getOrDefault("hl", setup.heightInner)
                     setup.heightOuter = config.getOrDefault("hr", setup.heightOuter)
                     setup.impulseInner = config.getOrDefault("hul", setup.impulseInner)

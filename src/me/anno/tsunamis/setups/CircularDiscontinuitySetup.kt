@@ -8,11 +8,11 @@ import me.anno.maths.Maths.mix
 import org.joml.Vector2f.lengthSquared
 import kotlin.math.max
 
-class CircularDiscontinuity : FluidSimSetup {
+class CircularDiscontinuitySetup : FluidSimSetup {
 
     constructor()
 
-    constructor(base: CircularDiscontinuity) {
+    constructor(base: CircularDiscontinuitySetup) {
         base.copy(this)
     }
 
@@ -55,11 +55,11 @@ class CircularDiscontinuity : FluidSimSetup {
         dst.fill(-heightOuter)
     }
 
-    override fun clone() = CircularDiscontinuity(this)
+    override fun clone() = CircularDiscontinuitySetup(this)
 
     override fun copy(clone: PrefabSaveable) {
         super.copy(clone)
-        clone as CircularDiscontinuity
+        clone as CircularDiscontinuitySetup
         clone.heightInner = heightInner
         clone.heightOuter = heightOuter
         clone.impulseInner = impulseInner
@@ -68,6 +68,6 @@ class CircularDiscontinuity : FluidSimSetup {
         clone.withAntialiasing = withAntialiasing
     }
 
-    override val className: String = "Tsunamis/CircularDiscontinuity"
+    override val className: String = "Tsunamis/CircularDiscontinuitySetup"
 
 }

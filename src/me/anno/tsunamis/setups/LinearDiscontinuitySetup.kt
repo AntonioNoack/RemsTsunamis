@@ -4,11 +4,11 @@ import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.io.serialization.SerializedProperty
 import kotlin.math.max
 
-class LinearDiscontinuity : FluidSimSetup {
+class LinearDiscontinuitySetup : FluidSimSetup {
 
     constructor()
 
-    constructor(base: LinearDiscontinuity) {
+    constructor(base: LinearDiscontinuitySetup) {
         base.copy(this)
     }
 
@@ -47,17 +47,17 @@ class LinearDiscontinuity : FluidSimSetup {
         dst.fill(0f)
     }
 
-    override fun clone() = LinearDiscontinuity(this)
+    override fun clone() = LinearDiscontinuitySetup(this)
 
     override fun copy(clone: PrefabSaveable) {
         super.copy(clone)
-        clone as LinearDiscontinuity
+        clone as LinearDiscontinuitySetup
         clone.heightLeft = heightLeft
         clone.heightRight = heightRight
         clone.impulseLeft = impulseLeft
         clone.impulseRight = impulseRight
     }
 
-    override val className: String = "Tsunamis/LinearDiscontinuity"
+    override val className: String = "Tsunamis/LinearDiscontinuitySetup"
 
 }

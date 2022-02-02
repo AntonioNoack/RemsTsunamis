@@ -9,8 +9,9 @@ import me.anno.gpu.hidden.HiddenOpenGLContext
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.ShaderLib
 import me.anno.gpu.shader.builder.Variable
+import me.anno.tsunamis.aracluster.HeadlessOpenGLContext
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.getMaxValue
-import me.anno.tsunamis.engine.gpu.ComputeEngine
+import me.anno.tsunamis.engine.gpu.GraphicsEngine
 import me.anno.tsunamis.perf.SetupLoader
 import me.anno.tsunamis.perf.SetupLoader.getOrDefault
 import me.anno.utils.OS.desktop
@@ -69,13 +70,18 @@ object VideoRenderer {
 
         LOGGER.info("Output Size: $outputWidth x $outputHeight")
 
-        // todo context should be customizable
-        // theoretically, it would be nice if this worked without a GPU too
-        // HeadlessContext.createContext(w, h, false)
-        HiddenOpenGLContext.createOpenGL(w, h)
+        if (config.getOrDefault("egl", false)) {
+            val useDefaultDisplay = config.getOrDefault("eglUseDefaultDisplay", false)
+            // this size parameter shouldn't matter
+            // it's the size of the default framebuffer
+            HeadlessOpenGLContext.createContext(512, 512, useDefaultDisplay)
+        } else {
+            HiddenOpenGLContext.createOpenGL()
+        }
+
         ShaderLib.init()
 
-        val engine = ComputeEngine(w, h)
+        val engine = GraphicsEngine(w, h)
 
         val maxMomentum = config.getOrDefault("maxMomentum", 100f)
 
