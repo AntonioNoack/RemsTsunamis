@@ -6,13 +6,15 @@ This is a report about what the extension implements, how it can be used, and wh
 
 For building instructions, please refer to the [README.md](https://github.com/AntonioNoack/RemsTsunamis).
 
-## Creating an extension
+## Integration into Rem's Engine & Visualization
+
+### Creating an extension
 
 To create the extension was [relatively simple](https://github.com/AntonioNoack/RemsStudio/wiki/Creating-Custom-Extensions), and to translate the existing C++ code to Java as well.
 If I were to use native libraries, I would have to compile them for all target architectures (Windows x64, Windows x86, Windows ARM, Linux ARM32, Linux ARM64, MacOS, maybe Android) of the engine.
 
 
-## Drawing displacements
+### Drawing displacements
 
 The extension allows the user to hand-draw tsunamis for testing. It is currently implemented as linear line segments (with a width),
 which are applied as kernel functions. The drawing direction defines in which direction the fluid will be higher, and in
@@ -22,7 +24,7 @@ The drawing mode has to be enabled with the button "Toggle Edit Mode". When the 
 These kernels work on all solver/engine types.
 
 
-## Limiting iterations per frame
+### Limiting iterations per frame
 
 There are three factors, which limit the number of computed iterations per displayed frame:
 "Compute Budget FPS", "Time Factor" and "Max Iterations Per Frame".
@@ -34,7 +36,7 @@ if a time step would simulate more time than the length of the previously displa
 
 The idea of "Time Factor" is that, e.g. a value of 60 would simulate a minute of progress every second, if the solver is fast enough.
 
-## Simulating large fields with visualization
+### Simulating large fields with visualization
 
 To run large simulations on GPU engines, and visualize them at the same time, it is recommended to enable synchronization, so
 the engine on the CPU side can measure the cost of the invoked GPU operations.
@@ -43,7 +45,7 @@ An alternative is to set the property "maxIterationsPerFrame" of the solver.
 
 If synchronization is disabled, the cost of rendering commands will be underestimated, because the actual execution of these commands is asynchronous.
 
-## Visualization Modes
+### Visualization Modes
 
 There are four visualization modes currently implemented: x-momentum, y-momentum, momentum (L2 norm), water-surface height, and height map.
 Height map will display the height map of the bathymetry data. The scale of that color map is defined as "Color Map Scale".
@@ -51,14 +53,25 @@ All other types display dynamic simulation data, and the scale of the color map 
 
 Water surface will assume that the default water height is zero, and will color water above zero red, and water below blue.
 
-## Bathymetry Visualization
+### Fluid Visualization
 
-Bathymetry is currently defined as a static (not changing) procedural mesh. It's vertices will be set by the CPU, and then sent to the GPU using [vertex buffer objects](https://www.khronos.org/opengl/wiki/Vertex_Specification).
+All GPU engines (see Section "Engine Types") use a customized vertex shader, so the simulation data can be displayed directly from the GPU.
+It is implemented in the object *YTextureShader*.
+
+It supports displaying the colors interpolated, or as square cells (option "Nearest Neighbor Colors" of *FluidSim* class).
+
+The CPU engine supports that shader, or a second mode. In this second mode, the triangle mesh is created on the CPU, and then uploaded to the GPU.
+The two modes can be toggled by enabling/disabling the flag "Use Texture Data" of the *FluidSim* instance.
+
+### Bathymetry Visualization
+
+Bathymetry is currently defined as a static (not changing) procedural mesh. It's vertices will be set by the CPU,
+and then sent to the GPU using [vertex buffer objects](https://www.khronos.org/opengl/wiki/Vertex_Specification).
 To visualize bathymetry within the engine, a second procedural mesh needs to be added, because I wanted to keep fluid and bathymetry separated.
 
 For this, add a "Manual Procedural Mesh" to your entity, and link (via drag & drop) it to the property "Bathymetry Mesh" of your "Fluid Sim" component.
 
-## Video Renderer
+### Video Renderer
 
 Additionally to the engine extension, and the performance tester, the object *VideoRenderer* contains an application that can render a simulation
 into a video using the internal video editor project.
@@ -282,7 +295,7 @@ In the engine type with two passes, 4 floats are loaded in the first pass, 4 are
 For the FP16 types, the information is loaded and stored as half precision floats (2 bytes per half float). The type with FP32 loads single precision (4 bytes per float) bathymetry data.
 The FP16 types only store height and the component of the momentum, that was changed (h,hu for x-axis / h,hv for y-axis).
 
-## Short Analysis
+### Short Analysis
 
 For the Radeon RX 580 this means that it was probably memory-bandwidth limited.
 The Tesla P100 had unknown issues with the Compute pipeline, but may be bandwidth limited as well.
@@ -295,6 +308,12 @@ With AVX512 instructions, the Xeon processor would be up to 16x than currently w
 
 For visualization, I prefer the GPU solvers, because they already are on the GPU, so no huge GPU-CPU memory transfers need to be regularly executed.
 
+### Future Optimizations
+
+Most engines write copy bathymetry and the other component (y/x for x/y-axis) of the momentum.
+Optimizing this would mean less bandwidth, and when the tested GPUs are indeed memory limited, this would improve performance further.
+These optimizations would not improve the results for the FP16 engines, as they already use this approach.
+
 ## Graphics Pipeline VS Compute Pipeline - Ease of implementation
 
 Since on my GPU there is no performance difference, and on the Tesla P100, the graphics pipeline currently is twice as fast, 
@@ -302,9 +321,3 @@ it's hard to generally use the Compute pipeline.
 
 The main core is thanks to GLSL the same, so only loading, storing, and where the computation takes place differs.
 The Compute pipeline offers more advanced features, but they may not be needed in every scenario.
-
-## Future Optimizations
-
-Most engines write copy bathymetry and the other component (y/x for x/y-axis) of the momentum.
-Optimizing this would mean less bandwidth, and when the tested GPUs are indeed memory limited, this would improve performance further.
-These optimizations would not improve the results for the FP16 engines, as they already use this approach.
