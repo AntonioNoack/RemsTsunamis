@@ -9,9 +9,10 @@ import me.anno.gpu.hidden.HiddenOpenGLContext
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.ShaderLib
 import me.anno.gpu.shader.builder.Variable
-import me.anno.tsunamis.aracluster.HeadlessOpenGLContext
+import me.anno.tsunamis.egl.EGLContext
+import me.anno.tsunamis.engine.CPUEngine
+import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.getMaxValue
-import me.anno.tsunamis.engine.gpu.GraphicsEngine
 import me.anno.tsunamis.perf.SetupLoader
 import me.anno.tsunamis.perf.SetupLoader.getOrDefault
 import me.anno.utils.OS.desktop
@@ -49,8 +50,6 @@ object VideoRenderer {
     @JvmStatic
     fun main(args: Array<String>) {
 
-        // todo engine should be customizable
-
         val fullSetup = SetupLoader.load(args)
         val setup = fullSetup.setup
         val config = fullSetup.config
@@ -65,23 +64,35 @@ object VideoRenderer {
 
         val outputScale = config.getOrDefault("outputScale", min(1f, 1024f / w))
 
-        val outputWidth = (w * outputScale).roundToInt().and(1.inv())
-        val outputHeight = (h * outputScale).roundToInt().and(1.inv())
+        val outputWidth = (w * outputScale).roundToInt()
+            .and(1.inv()) // round size, and make even (because some codecs only support even side lengths)
+        val outputHeight = (h * outputScale).roundToInt()
+            .and(1.inv())
 
-        LOGGER.info("Output Size: $outputWidth x $outputHeight")
+        val engineType = when (config.getOrDefault("engineType", "").lowercase()) {
+            "compute" -> EngineType.GPU_COMPUTE
+            "fp16-b16" -> EngineType.GPU_COMPUTE_FP16B16
+            "fp16-b32" -> EngineType.GPU_COMPUTE_FP16B32
+            "shared-memory" -> EngineType.GPU_SHARED_MEMORY
+            "two-passes" -> EngineType.GPU_2PASSES
+            "yx" -> EngineType.GPU_COMPUTE_YX
+            else -> EngineType.GPU_GRAPHICS
+        }
+
+        LOGGER.info("Output Size: $outputWidth x $outputHeight, engine type: $engineType")
 
         if (config.getOrDefault("egl", false)) {
             val useDefaultDisplay = config.getOrDefault("eglUseDefaultDisplay", false)
             // this size parameter shouldn't matter
             // it's the size of the default framebuffer
-            HeadlessOpenGLContext.createContext(512, 512, useDefaultDisplay)
+            EGLContext.createContext(512, 512, useDefaultDisplay)
         } else {
             HiddenOpenGLContext.createOpenGL()
         }
 
         ShaderLib.init()
 
-        val engine = GraphicsEngine(w, h)
+        val engine = EngineType.create(engineType, w, h) as CPUEngine
 
         val maxMomentum = config.getOrDefault("maxMomentum", 100f)
 

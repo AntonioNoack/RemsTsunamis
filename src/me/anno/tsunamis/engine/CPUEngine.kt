@@ -144,7 +144,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
             val b = bathymetry
 
             // step on x axis
-            FluidSim.threadPool.processBalanced(-1, height + 1, 4) { y0, y1 ->
+            threadPool.processBalanced(-1, height + 1, 4) { y0, y1 ->
                 val tmp4f = FluidSim.tmpV4ByThread.get()
                 for (y in y0 until y1) {
                     var index0 = getIndex(-1, y)
@@ -170,7 +170,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
             // step on y axis
             val b = bathymetry
             val stride = width + 2
-            FluidSim.threadPool.processBalanced(-1, height, 4) { y0, y1 ->
+            threadPool.processBalanced(-1, height, 4) { y0, y1 ->
                 val tmp4f = FluidSim.tmpV4ByThread.get()
                 for (y in y0 until y1) {
                     var index0 = getIndex(0, y)
@@ -305,7 +305,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
         fun copy(src: FloatArray, dst: FloatArray = FloatArray(src.size)): FloatArray {
             if (src.size * 4 >= 1_000_000) {
-                FluidSim.threadPool.processBalanced(0, min(src.size, dst.size), false) { i0, i1 ->
+                threadPool.processBalanced(0, min(src.size, dst.size), false) { i0, i1 ->
                     System.arraycopy(src, i0, dst, i0, i1 - i0)
                 }
             } else {

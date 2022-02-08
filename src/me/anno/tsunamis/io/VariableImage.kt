@@ -1,9 +1,9 @@
 package me.anno.tsunamis.io
 
 import me.anno.image.Image
-import me.anno.image.colormap.LinearColorMap
 import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.mix
+import me.anno.tsunamis.FluidSimMod.Companion.linColorMap
 import me.anno.utils.Clock
 import ucar.ma2.DataType
 import ucar.nc2.Variable
@@ -60,15 +60,7 @@ class VariableImage(variable: Variable) : Image(
     private val wm2 = width - 2f
     private val hm2 = height - 2f
 
-    private val colorMap = LinearColorMap(
-        min, max,
-        LinearColorMap.negInfColor,
-        0x0055ff or black, // blue
-        0xffffff or black, // white
-        0xff0000 or black, // red
-        LinearColorMap.posInfColor,
-        LinearColorMap.nanColor
-    )
+    private val colorMap = linColorMap.clone(min, max)
 
     override fun getRGB(p0: Int): Int {
         // if there is a special name like height or bathymetry, we could apply different color maps

@@ -77,9 +77,29 @@ object GLSLSolver {
             "   return dst;\n" +
             "}\n"
 
-    // todo why is it not working inside 1 call???
     const val fWaveSolverFull = fWaveSolverHalf + "vec4 solve(vec3 data0, vec3 data1){\n" +
-            "   return vec4(solveXY(data0, data1), solveZW(data0, data1));\n" +
+            fWaveSolverParams +
+            "   if(h.x <= 0.0 || h.y <= 0.0) return vec4(0);\n" + // on land
+            fWaveSolverBase + // 39 flops
+            "   vec2 dst1 = vec2(0.0);\n" +
+            "   if(lambda.x < 0.0){\n" +
+            "       dst1.x  = deltaH.x;\n" +
+            "       dst1.y  = deltaHu.x;\n" +
+            "   }\n" +
+            "   if(lambda.y < 0.0){\n" +
+            "       dst1.x += deltaH.y;\n" + // 1 flop
+            "       dst1.y += deltaHu.y;\n" + // 1 flop
+            "   }\n" +
+            "   vec2 dst2 = vec2(0.0);\n" +
+            "   if(lambda.x > 0.0){\n" +
+            "       dst2.x  = deltaH.x;\n" +
+            "       dst2.y  = deltaHu.x;\n" +
+            "   }\n" +
+            "   if(lambda.y > 0.0){\n" +
+            "       dst2.x += deltaH.y;\n" +
+            "       dst2.y += deltaHu.y;\n" +
+            "   }\n" +
+            "   return vec4(dst1, dst2);\n" +
             "}\n" // total: 41 flops
 
     fun createTextureData(

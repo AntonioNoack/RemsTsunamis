@@ -122,7 +122,7 @@ object FWaveSolver {
             dst[2] += deltaH1
             dst[3] += deltaHu1
         }
-        if (dst.any { it.isNaN() }) {
+        if (dst.any { it.isNaN() }) {// unscientific saving the simulation
             dst.fill(0f)
         }
         // if (dst.any { it.isNaN() }) throw RuntimeException("NaN from $h0 $h1, $hu0 $hu1, $b0 $b1, $gravity")

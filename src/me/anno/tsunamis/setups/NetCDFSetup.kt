@@ -5,7 +5,7 @@ import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference
-import me.anno.io.files.FileReference.Companion.getReference
+import me.anno.io.files.InvalidRef
 import me.anno.io.serialization.SerializedProperty
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.io.NetCDFImageCache.getData
@@ -17,12 +17,10 @@ import me.anno.utils.hpc.HeavyProcessing.processBalanced
 class NetCDFSetup : FluidSimSetup() {
 
     @SerializedProperty
-    var bathymetryFile: FileReference =
-        getReference("E:/Documents/Uni/Master/WS2122/tohoku_gebco08_ucsb3_250m_bath.nc")
+    var bathymetryFile: FileReference = InvalidRef
 
     @SerializedProperty
-    var displacementFile: FileReference =
-        getReference("E:/Documents/Uni/Master/WS2122/tohoku_gebco08_ucsb3_250m_displ.nc")
+    var displacementFile: FileReference = InvalidRef
 
     @Range(0.0, Double.POSITIVE_INFINITY)
     @SerializedProperty
@@ -32,16 +30,14 @@ class NetCDFSetup : FluidSimSetup() {
     var applyAveraging = true
 
     @DebugProperty
-    @Suppress("UNUSED")
+    @Suppress("unused")
     val dataWidth
         get() = getData(bathymetryFile, true)?.width ?: -1
 
     @DebugProperty
-    @Suppress("UNUSED")
+    @Suppress("unused")
     val dataHeight
         get() = getData(bathymetryFile, true)?.height ?: -1
-
-    // todo code preferred cell size
 
     override fun getPreferredNumCellsX(): Int {
         return getData(bathymetryFile, false)!!.getWidth()

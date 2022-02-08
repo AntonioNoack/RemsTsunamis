@@ -7,6 +7,7 @@ import me.anno.maths.Maths
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.FluidSim.Companion.coarseIndexToFine
 import me.anno.tsunamis.FluidSim.Companion.f0
+import me.anno.tsunamis.FluidSimMod.Companion.linColorMap
 import me.anno.tsunamis.Visualisation
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
@@ -125,10 +126,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                 }
             },
             if (colorMap == null) object : TerrainUtils.ColorMap {
-                override fun get(it: Int): Int {
-                    val i = coarseIndexToFine(w, h, cw, ch, it)
-                    return getLandColor(bathymetry[i])
-                }
+                override fun get(it: Int): Int = -1
             } else object : TerrainUtils.ColorMap {
                 override fun get(it: Int): Int {
                     val i = coarseIndexToFine(w, h, cw, ch, it)
@@ -201,17 +199,12 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             return maxVelocity
         }
 
-        private fun getLandColor(height: Float): Int {
-            return -1
-        }
-
         private fun getWaterColor(height: Float): Int {
             return Maths.mixARGB(0xabbee3, 0x103273, Maths.clamp(height * 0.1f, 0f, 1f))
         }
 
-        private fun getColor11(f: Float, pos: Int = 0xff0000, zero: Int = -1, neg: Int = 0x0055ff): Int {
-            if (!f.isFinite()) return 0xff00ff
-            return if (f < 0f) Maths.mixARGB(neg, zero, f + 1f) else Maths.mixARGB(zero, pos, f)
+        private fun getColor11(f: Float): Int {
+            return linColorMap.getColor(f)
         }
 
         /**

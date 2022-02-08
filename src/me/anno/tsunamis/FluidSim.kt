@@ -56,7 +56,6 @@ import kotlin.math.min
 
 /**
  * simple 3d mesh, which simulates water
- * // todo bug: if is cpu solver, ghost cells are displayed / sent to the gpu, it seems
  * */
 @ExecuteInEditMode
 class FluidSim : ProceduralMesh, CustomEditMode {
@@ -67,7 +66,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         base.copy(this)
     }
 
-    var engineType: EngineType = EngineType.CPU
+    var engineType: EngineType = EngineType.GPU_COMPUTE_FP16B16 // best performance, so default
         set(value) {
             if (field != value) {
                 field = value
@@ -398,7 +397,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
             GFX.check()
 
-            // todo setting type to cpu doesn't work & resetting makes it wrong-values-only
             if (oldEngine != null && oldEngine !== newEngine) {
                 if (newEngine.width == oldEngine.width &&
                     newEngine.height == oldEngine.height
@@ -827,8 +825,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     override fun onEditMove(x: Float, y: Float, dx: Float, dy: Float): Boolean {
         if (Input.isLeftDown) {
             // critical velocity: sqrt(g*h), so make it that we draw that within 10s
-            // todo modes: drag fluid down, drag fluid up, todo start wave here to left/right/top/bottom/...
-            // todo add fluid, remove fluid
             val time = System.nanoTime()
             val minDt = 1f / 60f
             val deltaTime = (time - lastChange) * 1e-9f

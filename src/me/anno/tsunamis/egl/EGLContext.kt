@@ -1,4 +1,4 @@
-package me.anno.tsunamis.aracluster
+package me.anno.tsunamis.egl
 
 import me.anno.gpu.GFX
 import org.apache.logging.log4j.LogManager
@@ -11,9 +11,9 @@ import org.lwjgl.egl.EXTPlatformDevice.EGL_PLATFORM_DEVICE_EXT
 import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11.*
 
-object HeadlessOpenGLContext {
+object EGLContext {
 
-    private val LOGGER = LogManager.getLogger(HeadlessOpenGLContext::class)
+    private val LOGGER = LogManager.getLogger(EGLContext::class)
 
     private var display = 0L
 

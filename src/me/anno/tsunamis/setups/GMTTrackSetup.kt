@@ -10,6 +10,7 @@ import me.anno.image.colormap.LinearColorMap
 import me.anno.io.csv.CSVReader
 import me.anno.io.files.FileReference
 import me.anno.io.files.FileReference.Companion.getReference
+import me.anno.io.files.InvalidRef
 import me.anno.io.serialization.SerializedProperty
 import me.anno.maths.Maths.mix
 import me.anno.maths.Maths.unmix
@@ -24,13 +25,8 @@ import kotlin.math.sin
 
 class GMTTrackSetup : FluidSimSetup() {
 
-    // todo remove all file references, or make them local (users should not worry about awkward paths)
-
-    // todo define artificial displacement
-
     @SerializedProperty
-    var sourceFile: FileReference =
-        getReference("E:/Documents/Uni/Master/WS2122/tsunami/data/fukushima.csv")
+    var sourceFile: FileReference = InvalidRef
 
     @Range(0.0, Double.POSITIVE_INFINITY)
     @SerializedProperty

@@ -4,14 +4,15 @@ import me.anno.config.DefaultStyle.black
 import me.anno.gpu.drawing.DrawRectangles.drawRect
 import me.anno.gpu.drawing.DrawTexts.drawSimpleTextCharByChar
 import me.anno.gpu.drawing.DrawTexts.monospaceFont
-import me.anno.image.colormap.LinearColorMap
 import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.mix
+import me.anno.tsunamis.FluidSimMod.Companion.linColorMap
 import me.anno.tsunamis.io.ColorMap
 import me.anno.ui.Panel
 import me.anno.ui.base.constraints.AxisAlignment
 import me.anno.ui.style.Style
-import kotlin.math.*
+import kotlin.math.max
+import kotlin.math.min
 
 class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
 
@@ -29,7 +30,7 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
     }
 
     override fun onDraw(x0: Int, y0: Int, x1: Int, y1: Int) {
-        drawBackground()
+        drawBackground(x0, y0, x1, y1)
         val font = monospaceFont.value
         val xs = x + padding
         val ys = y + padding + font.sampleHeight / 2
@@ -52,9 +53,10 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
                 drawRect(xs, y, stripeW, 1, color)
             }
         } else {
+            val lcm = linColorMap
             for (y in max(y0, ys) until min(y1, ye)) {
                 val v = 1f - (y - ys) * 2f / (ye - ys)
-                val color = linColorMap.getColor(v)
+                val color = lcm.getColor(v)
                 drawRect(xs, y, stripeW, 1, color)
             }
         }
@@ -77,13 +79,5 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
             // draw a small stripe to show where exactly the number belongs to
             drawRect(xe - padding, y, padding / 2, 1, black)
         }
-    }
-
-    companion object {
-
-        // todo we should centralize all indicator colors
-        private val linColorMap = LinearColorMap(0x0055ff or black, -1, 0xff0000 or black)
-            .clone(-1f, 1f)
-
     }
 }

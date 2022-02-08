@@ -1,10 +1,12 @@
 package me.anno.tsunamis
 
+import me.anno.config.DefaultStyle
 import me.anno.engine.RemsEngine
 import me.anno.extensions.ExtensionLoader
 import me.anno.extensions.mods.Mod
 import me.anno.image.Image
 import me.anno.image.ImageCPUCache
+import me.anno.image.colormap.LinearColorMap
 import me.anno.io.ISaveable.Companion.registerCustomClass
 import me.anno.io.files.FileReference
 import me.anno.io.files.Signature
@@ -89,6 +91,10 @@ class FluidSimMod : Mod() {
     }
 
     companion object {
+
+        val linColorMap = LinearColorMap(0x0055ff or DefaultStyle.black, -1, 0xff0000 or DefaultStyle.black)
+            .clone(-1f, 1f)
+
         @JvmStatic
         fun main(args: Array<String>) {
             ExtensionLoader.loadMainInfo()

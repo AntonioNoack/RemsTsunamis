@@ -4,7 +4,7 @@ import me.anno.Engine
 import me.anno.gpu.hidden.HiddenOpenGLContext
 import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.files.InvalidRef
-import me.anno.tsunamis.aracluster.HeadlessOpenGLContext
+import me.anno.tsunamis.egl.EGLContext
 import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.perf.SetupLoader.getOrDefault
 import me.anno.utils.Sleep.waitUntil
@@ -158,7 +158,7 @@ fun main(args: Array<String>) {
             val useDefaultDisplay = config.getOrDefault("eglUseDefaultDisplay", false)
             // this size parameter shouldn't matter
             // it's the size of the default framebuffer
-            HeadlessOpenGLContext.createContext(512, 512, useDefaultDisplay)
+            EGLContext.createContext(512, 512, useDefaultDisplay)
         } else {
             HiddenOpenGLContext.createOpenGL()
         }
@@ -279,7 +279,7 @@ fun main(args: Array<String>) {
     }
 
     if (testGPU && config.getOrDefault("egl", false)) {
-        HeadlessOpenGLContext.destroyContext()
+        EGLContext.destroyContext()
     }
 
     // stop all remaining threads gracefully

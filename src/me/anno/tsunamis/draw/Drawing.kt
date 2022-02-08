@@ -90,7 +90,7 @@ object Drawing {
             is CPUEngine -> {
                 val minPerThread = 4000 / (cellMaxX - cellMinX)
                 HeavyProcessing.processBalanced(cellMinY, cellMaxY, minPerThread) { y0, y1 ->
-                    // todo shorten line by 1px, so we don't draw that pixel twice?
+                    // shorten line by 1px, so we don't draw that pixel twice?
                     // todo or draw using a spline instead?
                     val fluidHeight = engine.fluidHeight
                     for (yi in y0 until y1) {
