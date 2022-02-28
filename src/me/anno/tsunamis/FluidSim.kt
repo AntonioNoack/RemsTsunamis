@@ -1,5 +1,6 @@
 package me.anno.tsunamis
 
+import me.anno.Engine
 import me.anno.ecs.annotations.*
 import me.anno.ecs.components.cache.MaterialCache
 import me.anno.ecs.components.mesh.ManualProceduralMesh
@@ -465,7 +466,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             }
             if (!isPaused) {
                 val engine = engine!!
-                val dt = GFX.deltaTime * timeFactor
+                val dt = Engine.deltaTime * timeFactor
                 if (dt > 0f) {
                     if (engine.supportsAsyncCompute()) {
                         if (computingThread == null) {
@@ -765,7 +766,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             entity!!,
             RenderView.camPosition,
             RenderView.mouseDir,
-            1e6,
+            0.0, 0.0, 1e6,
             Raycast.TypeMask.TRIANGLES,
             -1,
             true

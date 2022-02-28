@@ -31,7 +31,7 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
 
     override fun onDraw(x0: Int, y0: Int, x1: Int, y1: Int) {
         drawBackground(x0, y0, x1, y1)
-        val font = monospaceFont.value
+        val font = monospaceFont
         val xs = x + padding
         val ys = y + padding + font.sampleHeight / 2
         val ye = y + h - padding - font.sampleHeight / 2
