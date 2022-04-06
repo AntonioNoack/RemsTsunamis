@@ -134,9 +134,23 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                 }
             }
         )
+        // todo why is this not working directly???...
+        val mesh1 = mesh.mesh2
+        mesh1.indices!!.flipIndices()
     }
 
     companion object {
+
+        private fun IntArray.flipIndices() {
+            var i = 0
+            val lastIndex = size - 2
+            while (i < lastIndex) {
+                val tmp = this[i]
+                this[i] = this[i + 1]
+                this[i + 1] = tmp
+                i += 3
+            }
+        }
 
         fun setGhostOutflow(width: Int, height: Int, v: FloatArray) {
 

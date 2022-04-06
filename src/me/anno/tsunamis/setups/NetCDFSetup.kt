@@ -1,16 +1,19 @@
 package me.anno.tsunamis.setups
 
+import me.anno.Engine
 import me.anno.ecs.annotations.DebugProperty
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference
+import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.files.InvalidRef
 import me.anno.io.serialization.SerializedProperty
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.io.NetCDFImageCache.getData
 import me.anno.tsunamis.io.VariableImage
 import me.anno.tsunamis.setups.ShoreLine.toBathymetry
+import me.anno.tsunamis.setups.ShoreLine.toFluidHeight
 import me.anno.utils.Sleep.waitUntil
 import me.anno.utils.hpc.HeavyProcessing.processBalanced
 
@@ -80,26 +83,26 @@ class NetCDFSetup : FluidSimSetup() {
     override fun fillHeight(w: Int, h: Int, dst: FloatArray) {
         val bathymetryData = getData(bathymetryFile, false)!!
         fillData(w, h, dst, bathymetryData)
-        val shoreMax = shoreCliffHeight
         threadPool.processBalanced(0, dst.size, 65536) { i0, i1 ->
+            val shoreCliffHeight = shoreCliffHeight
             for (i in i0 until i1) {
-                dst[i] = toBathymetry(dst[i], shoreMax)
+                dst[i] = toFluidHeight(dst[i], shoreCliffHeight)
             }
         }
     }
 
     override fun fillBathymetry(w: Int, h: Int, dst: FloatArray) {
         val bathymetryData = getData(bathymetryFile, false)!!
-        val displacement = getData(displacementFile, false)!!
         fillData(w, h, dst, bathymetryData)
-        val shoreMax = shoreCliffHeight
-        if (shoreMax > 0f) {
+        if (shoreCliffHeight > 0f) {
             threadPool.processBalanced(0, dst.size, 65536) { i0, i1 ->
+                val shoreCliffHeight = shoreCliffHeight
                 for (i in i0 until i1) {
-                    dst[i] = toBathymetry(dst[i], shoreMax)
+                    dst[i] = toBathymetry(dst[i], shoreCliffHeight)
                 }
             }
         }
+        val displacement = getData(displacementFile, false)!!
         addData(w, h, dst, displacement)
     }
 
@@ -195,12 +198,19 @@ class NetCDFSetup : FluidSimSetup() {
         @JvmStatic
         fun main(args: Array<String>) {
             val setup = NetCDFSetup()
+            val folder = getReference("E:\\Documents\\Uni\\Master\\WS2122")
+            setup.bathymetryFile = folder.getChild("tohoku_gebco08_ucsb3_250m_bath.nc")
+            setup.displacementFile = folder.getChild("tohoku_gebco08_ucsb3_250m_displ.nc")
             waitUntil(true) { setup.isReady() }
-            val w = setup.dataWidth
-            val h = setup.dataHeight
-            val bath = FloatArray((w + 2) * (h + 2))
-            setup.fillBathymetry(w, h, bath)
-            ImageWriter.writeImageFloat(w + 2, h + 2, "bath.png", true, bath)
+            val w = setup.dataWidth / 10 + 2
+            val h = setup.dataHeight / 10 + 2
+            val size = w * h
+            val data = FloatArray(size)
+            setup.fillBathymetry(w - 2, h - 2, data)
+            ImageWriter.writeImageFloat(w, h, "bath1.png", true, data)
+            setup.fillHeight(w - 2, h - 2, data)
+            ImageWriter.writeImageFloat(w, h, "height1.png", true, data)
+            Engine.requestShutdown()
         }
 
     }
