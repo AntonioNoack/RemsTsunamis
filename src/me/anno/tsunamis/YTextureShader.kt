@@ -121,7 +121,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "int cellIndex  = instanceId >> 1;\n" +
                     "int partOfCell = gl_VertexID + (instanceId & 1) * 3;\n" +
                     "int deltaX[6] = { 0, 1, 1, 1, 0, 0 };\n" +
-                    "int deltaY[6] = { 0, 0, 1, 1, 0, 1 };\n" +
+                    "int deltaY[6] = { 0, 1, 0, 1, 0, 1 };\n" +
                     "int numCellsX = max(1, coarseSize.x - 1);\n" +
                     "int numCellsY = max(1, coarseSize.y - 1);\n" +
                     "ivec2 numCells = ivec2(numCellsX, numCellsY);\n" +
@@ -184,7 +184,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
 
         val original = super.createFragmentStage(instanced)
 
-        val fragmentVariables = original.parameters + listOf(
+        val fragmentVariables = original.variables + listOf(
             Variable(GLSLType.BOOL, "nearestNeighborColors", VariableMode.IN),
             Variable(GLSLType.V4F, "fluidDataI", VariableMode.IN),
             Variable(GLSLType.S2D, "colorMap"),
@@ -220,7 +220,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "   finalNormal = mix(finalNormal, normalFromTex, normalStrength.x);\n" +
                     "}\n" +
                     "finalEmissive  = texture(emissiveMap, uv).rgb * emissiveBase;\n" +
-                    "finalOcclusion = 1.0 - (1.0 - texture(occlusionMap, uv).r) * occlusionStrength;\n" +
+                    "finalOcclusion = (1.0 - texture(occlusionMap, uv).r) * occlusionStrength;\n" +
                     "finalMetallic  = mix(metallicMinMax.x,  metallicMinMax.y,  texture(metallicMap,  uv).r);\n" +
                     "finalRoughness = mix(roughnessMinMax.x, roughnessMinMax.y, texture(roughnessMap, uv).r);\n" +
 

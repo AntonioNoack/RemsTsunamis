@@ -22,7 +22,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
 
     override fun createBuffer(buffer: Framebuffer, data: FloatArray) {
         buffer.ensure() // otherwise getColor() may be undefined
-        buffer.getColor0().createRGBA(data, false)
+        (buffer.getTexture0() as Texture2D).createRGBA(data, false)
         for (tex in buffer.textures) {
             tex.filtering = GPUFiltering.TRULY_NEAREST
             tex.clamping = Clamping.CLAMP
@@ -31,7 +31,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
 
     override fun createBuffer(buffer: Framebuffer) {
         buffer.ensure()
-        buffer.getColor0().createFP32()
+        (buffer.getTexture0() as Texture2D).createFP32()
         for (tex in buffer.textures) {
             tex.filtering = GPUFiltering.TRULY_NEAREST
             tex.clamping = Clamping.CLAMP
@@ -39,7 +39,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
     }
 
     override fun setFromTextureRGBA32F(texture: Texture2D) {
-        ComputeEngine.copyTextureRGBA32F(texture, this.src.getColor0())
+        ComputeEngine.copyTextureRGBA32F(texture, this.src.getTexture0() as Texture2D)
     }
 
     override fun step(gravity: Float, scaling: Float) {
@@ -65,7 +65,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
         synchronizeGraphics()
     }
 
-    override fun requestFluidTexture(cw: Int, ch: Int) = src.getColor0()
+    override fun requestFluidTexture(cw: Int, ch: Int) = src.getTexture0() as Texture2D
 
     override fun updateStatistics(sim: FluidSim) {}
 

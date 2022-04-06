@@ -58,10 +58,10 @@ object Drawing {
         when (val engine = sim.engine) {
             is GPUEngine<*> -> {
                 // this casting is currently correct, but may become incorrect with more engines
-                val src = engine.src as? Texture2D ?: (engine.src as Framebuffer).getColor0()
-                val tmp = engine.tmp as? Texture2D ?: (engine.tmp as Framebuffer).getColor0()
+                val src = engine.src as? Texture2D ?: (engine.src as Framebuffer).getTexture0() as Texture2D
+                val tmp = engine.tmp as? Texture2D ?: (engine.tmp as Framebuffer).getTexture0() as Texture2D
                 drawLineSegment(
-                    src, src, null, 0,
+                    src, tmp, null, 0,
                     rgbaShaders, GL_RGBA32F,
                     cellMinX, cellMaxX,
                     cellMinY, cellMaxY,

@@ -40,11 +40,11 @@ class NetCDFSetup : FluidSimSetup() {
         get() = getData(bathymetryFile, true)?.height ?: -1
 
     override fun getPreferredNumCellsX(): Int {
-        return getData(bathymetryFile, false)!!.getWidth()
+        return getData(bathymetryFile, false)!!.width
     }
 
     override fun getPreferredNumCellsY(): Int {
-        return getData(bathymetryFile, false)!!.getHeight()
+        return getData(bathymetryFile, false)!!.height
     }
 
     override fun isReady(): Boolean {

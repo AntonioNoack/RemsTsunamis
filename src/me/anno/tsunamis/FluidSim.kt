@@ -3,10 +3,7 @@ package me.anno.tsunamis
 import me.anno.Engine
 import me.anno.ecs.annotations.*
 import me.anno.ecs.components.cache.MaterialCache
-import me.anno.ecs.components.mesh.ManualProceduralMesh
-import me.anno.ecs.components.mesh.Material
-import me.anno.ecs.components.mesh.ProceduralMesh
-import me.anno.ecs.components.mesh.TypeValue
+import me.anno.ecs.components.mesh.*
 import me.anno.ecs.interfaces.CustomEditMode
 import me.anno.ecs.prefab.Prefab
 import me.anno.ecs.prefab.PrefabSaveable
@@ -367,6 +364,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val w = width
         val h = height
         val oldEngine = engine
+        if (!GFX.isGFXThread()) return false
         return if (oldEngine == null || oldEngine.width != width || oldEngine.height != height || wantsReset) {
 
             val setup = setup ?: return false
@@ -502,9 +500,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         return 1 // update every tick
     }
 
-    override fun generateMesh() {
+    override fun generateMesh(mesh: Mesh) {
         if (ensureFieldSize()) {
-            mesh2.hasHighPrecisionNormals = true
+            mesh.hasHighPrecisionNormals = true
             val engine = engine
             if (engine != null && engine.width == width && engine.height == height) {
                 generateFluidMesh(this)
@@ -767,7 +765,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             RenderView.camPosition,
             RenderView.mouseDir,
             0.0, 0.0, 1e6,
-            Raycast.TypeMask.TRIANGLES,
+            Raycast.TRIANGLES,
             -1,
             true
         )
@@ -985,7 +983,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 val tex2 = if (tex.w > w || tex.h > h) {
                     val buffer = FBStack["fluidSim", w, h, 4, true, 1, false]
                     buffer.ensure()
-                    scaleTextureRGBA32F(tex, buffer.getColor0())
+                    scaleTextureRGBA32F(tex, buffer.getTexture0() as Texture2D)
                 } else tex
                 // get the pixels from the image
                 val (pixels, _) = getPixels(tex2)

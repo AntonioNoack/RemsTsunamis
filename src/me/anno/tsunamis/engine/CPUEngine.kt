@@ -3,7 +3,7 @@ package me.anno.tsunamis.engine
 import me.anno.ecs.components.mesh.ProceduralMesh
 import me.anno.gpu.GFX
 import me.anno.gpu.texture.Texture2D
-import me.anno.gpu.texture.Texture2D.Companion.unpackAlignment
+import me.anno.gpu.texture.Texture2D.Companion.readAlignment
 import me.anno.io.serialization.NotSerializedProperty
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.FluidSim.Companion.threadPool
@@ -296,7 +296,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
             Texture2D.bindTexture(texture.target, texture.pointer)
 
-            unpackAlignment(width * height * 4)
+            readAlignment(width * height * 4)
             glGetTexImage(texture.target, 0, GL_RGBA, GL_FLOAT, floats)
 
             return Pair(floats, data)
