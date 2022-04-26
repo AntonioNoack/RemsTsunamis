@@ -31,61 +31,38 @@ open class FluidSimSetup : Component() {
     fun applyBorder(
         w: Int,
         h: Int,
-        height: FloatArray,
+        fluidHeight: FloatArray,
         bathymetry: FloatArray,
         momentumX: FloatArray,
         momentumY: FloatArray
     ) {
         val stride = w + 2
-        val bh = borderHeight
-        val fh = max(0f, -bh)
+        val newBathymetry = borderHeight
+        val newFluidHeight = max(0f, -newBathymetry)
         val yStride = h * stride
-        for (x in 1 until w) {
+        if (h > 1) for (x in 1 until w) {
             val i = x + stride
             val j = x + yStride
-            height[i] = fh
-            bathymetry[i] = bh
+            fluidHeight[i] = newFluidHeight
+            bathymetry[i] = newBathymetry
             momentumX[i] = 0f
             momentumY[i] = 0f
-            height[j] = fh
-            bathymetry[j] = bh
+            fluidHeight[j] = newFluidHeight
+            bathymetry[j] = newBathymetry
             momentumX[j] = 0f
             momentumY[j] = 0f
         }
-        for (y in 1..h) {
+        if (w > 1) for (y in 1..h) {
             val i = y * stride + 1
             val j = i + stride - 3
-            height[i] = fh
-            bathymetry[i] = bh
+            fluidHeight[i] = newFluidHeight
+            bathymetry[i] = newBathymetry
             momentumX[i] = 0f
             momentumY[i] = 0f
-            height[j] = fh
-            bathymetry[j] = bh
+            fluidHeight[j] = newFluidHeight
+            bathymetry[j] = newBathymetry
             momentumX[j] = 0f
             momentumY[j] = 0f
-        }
-    }
-
-    fun applyBorder(
-        w: Int,
-        h: Int,
-        height: FloatArray,
-    ) {
-        val stride = w + 2
-        val bh = borderHeight
-        val fh = max(0f, -bh)
-        val yStride = h * stride
-        for (x in 1 until w) {
-            val i = x + stride
-            val j = x + yStride
-            height[i] = fh
-            height[j] = fh
-        }
-        for (y in 1..h) {
-            val i = y * stride + 1
-            val j = i + stride - 3
-            height[i] = fh
-            height[j] = fh
         }
     }
 

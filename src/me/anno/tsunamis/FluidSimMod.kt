@@ -79,6 +79,7 @@ class FluidSimMod : Mod() {
         registerCustomClass(GMTTrackSetup())
         registerCustomClass(CriticalFlowSetup())
         registerCustomClass(PoolSetup())
+        registerCustomClass(ParabolaSetup())
 
     }
 

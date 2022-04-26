@@ -220,7 +220,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     var wantsReset = false
 
     @DebugAction
-    @Suppress("UNUSED")
+    @Suppress("unused")
     fun resetSimulation() {
         wantsReset = true
         computingThread?.interrupt()
@@ -230,7 +230,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     }
 
     @DebugAction
-    @Suppress("UNUSED")
+    @Suppress("unused")
     fun setFluidZero() {
         val engine = engine ?: return
         computingThread?.interrupt()
@@ -312,27 +312,27 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         return lx + ly * (width + 2)
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     fun getSurfaceHeightAt(x: Int, y: Int): Float {
         return engine!!.getSurfaceHeightAt(x, y)
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     fun getFluidHeightAt(x: Int, y: Int): Float {
         return engine!!.getFluidHeightAt(x, y)
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     fun getMomentumXAt(x: Int, y: Int): Float {
         return engine!!.getMomentumXAt(x, y)
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     fun getMomentumYAt(x: Int, y: Int): Float {
         return engine!!.getMomentumYAt(x, y)
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     fun getBathymetryAt(x: Int, y: Int): Float {
         return engine!!.getBathymetryAt(x, y)
     }
@@ -364,7 +364,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val w = width
         val h = height
         val oldEngine = engine
-        if (!GFX.isGFXThread()) return false
+        if (!GFX.isGFXThread()) {
+            LOGGER.debug("Not GFX thread")
+            return false
+        }
         return if (oldEngine == null || oldEngine.width != width || oldEngine.height != height || wantsReset) {
 
             val setup = setup ?: return false
@@ -430,9 +433,10 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         } else true
     }
 
-    fun initWithSetup(setup: FluidSimSetup) {
+    fun initWithSetup(setup: FluidSimSetup): Boolean {
         this.setup = setup
-        ensureFieldSize()
+        wantsReset = true
+        return ensureFieldSize()
     }
 
     @NotSerializedProperty

@@ -63,4 +63,6 @@ class LinearDiscontinuitySetup : FluidSimSetup {
 
     override val className: String = "Tsunamis/LinearDiscontinuitySetup"
 
+    override fun toString() = "LinearDiscontinuitySetup($heightLeft, $heightRight, $impulseLeft, $impulseRight, $bathymetryLeft, $bathymetryRight)"
+
 }

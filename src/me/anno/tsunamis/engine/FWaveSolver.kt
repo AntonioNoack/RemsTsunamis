@@ -1,10 +1,10 @@
 package me.anno.tsunamis.engine
 
+import me.anno.engine.ECSRegistry
 import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.setGhostOutflow
-import me.anno.tsunamis.setups.FluidSimSetup
 import me.anno.tsunamis.setups.LinearDiscontinuitySetup
 import org.apache.logging.log4j.LogManager
 import kotlin.math.abs
@@ -45,6 +45,7 @@ object FWaveSolver {
             var hu1 = huSrc[i1]
 
             // apply dry-wet condition
+            // todo wetting & drying
             if (!wet0) {// left cell is dry
                 h0 = h1
                 b0 = b1
@@ -127,7 +128,6 @@ object FWaveSolver {
         }
         // if (dst.any { it.isNaN() }) throw RuntimeException("NaN from $h0 $h1, $hu0 $hu1, $b0 $b1, $gravity")
     }
-
 
     fun solve(
         i0: Int, i1: Int,
@@ -239,9 +239,10 @@ object FWaveSolver {
         // if (dst.any { it.isNaN() }) throw RuntimeException("NaN from $h0 $h1, $hu0 $hu1, $b0 $b1, $gravity")
     }
 
-
     @JvmStatic
     fun main(args: Array<String>) {
+
+        ECSRegistry.initWithGFX(512)
 
         testBorder()
 
@@ -263,12 +264,13 @@ object FWaveSolver {
         val sim = FluidSim()
         sim.width = w
         sim.height = h
+        sim.engineType = EngineType.CPU
         val setup = LinearDiscontinuitySetup()
         setup.heightLeft = 0.2f
         setup.heightRight = 0.8f
         setup.borderHeight = 1.0f
         sim.setup = setup
-        sim.ensureFieldSize()
+        if (!sim.ensureFieldSize()) throw RuntimeException("Could not init field")
         val height = (sim.engine as CPUEngine).fluidHeight
         ImageWriter.writeImageFloat(w + 2, h + 2, "border.png", false, height)
     }
@@ -291,6 +293,7 @@ object FWaveSolver {
         val sim = FluidSim()
         sim.width = 100
         sim.height = 1
+        sim.engineType = EngineType.CPU
         val setup = LinearDiscontinuitySetup()
         setup.heightLeft = 10f
         setup.heightRight = 8f
@@ -298,12 +301,12 @@ object FWaveSolver {
         sim.setup = setup
         assert(sim.ensureFieldSize())
         val step = 0.1f
-        println((0 until 100).joinToString { sim.getFluidHeightAt(it, 0).toString() })
+        LOGGER.info((0 until 100).joinToString { sim.getFluidHeightAt(it, 0).toString() })
         sim.computeStep(step)
-        println((0 until 100).joinToString { sim.getFluidHeightAt(it, 0).toString() })
+        LOGGER.info((0 until 100).joinToString { sim.getFluidHeightAt(it, 0).toString() })
         for (i in 0 until 49) {
-            assert(sim.getFluidHeightAt(i, 0) == 10f)
-            assert(sim.getMomentumXAt(i, 0) == 0f)
+            assert(sim.getFluidHeightAt(i, 0), 10f)
+            assert(sim.getMomentumXAt(i, 0), 0f)
         }
         assert(sim.getFluidHeightAt(49, 0), 10 - step * 9.394671362f, 0.01f)
         assert(sim.getMomentumXAt(49, 0), step * 88.25985f, 0.01f)
@@ -319,8 +322,9 @@ object FWaveSolver {
         if (!b) throw RuntimeException()
     }
 
-    private fun assert(a: Float, b: Float, delta: Float) {
-        if (abs(a - b) > delta) throw RuntimeException("$a != $b, ${abs(a - b)} > $delta")
+    private fun assert(a: Float, b: Float, delta: Float = 0f) {
+        if (abs(a - b) > delta || a.isNaN() || b.isNaN())
+            throw RuntimeException("$a != $b, ${abs(a - b)} > $delta")
     }
 
     private fun testWithHandSelected() {
@@ -328,10 +332,10 @@ object FWaveSolver {
         val dst = FloatArray(4)
         val g = 9.81f
         solve(10f, 10f, 4f, 4f, 0f, 0f, g, dst)
-        assert(dst[0] == 0f)
-        assert(dst[1] == 0f)
-        assert(dst[2] == 0f)
-        assert(dst[3] == 0f)
+        assert(dst[0], 0f)
+        assert(dst[1], 0f)
+        assert(dst[2], 0f)
+        assert(dst[3], 0f)
         solve(10f, 0f, 10f, 0f, 0f, 0f, g, dst)
         println(dst.joinToString())
         assert(abs(+30.017855 - dst[0]) < 0.01)
@@ -352,29 +356,23 @@ object FWaveSolver {
         assert(abs(dst[3]) < 0.001)
     }
 
+    fun FloatArray.toStringInRows(modulo: Int) =
+        withIndex().joinToString { if (it.index > 0 && it.index % modulo == 0) "\n${it.value}" else "${it.value}" }
+
     private fun testFromFile() {
 
         val sim = FluidSim()
-        sim.width = 32
+        sim.width = 8
         sim.height = 1
         sim.gravity = 9.80665f
+        sim.engineType = EngineType.CPU
 
-        val halfIndex = sim.width / 2
+        val halfIndex = (sim.width - 1) / 2
 
-        var hl = 0f
-        var hr = 0f
-        var hul = 0f
-        var hur = 0f
-
-        val setup = object : FluidSimSetup() {
-            override fun getHeight(x: Int, y: Int, w: Int, h: Int): Float {
-                return if (x * 2 <= w) hl else hr
-            }
-
-            override fun getMomentumX(x: Int, y: Int, w: Int, h: Int): Float {
-                return if (x * 2 <= w) hul else hur
-            }
-        }
+        val setup = LinearDiscontinuitySetup()
+        setup.bathymetryLeft = 0f
+        setup.bathymetryRight = 0f
+        setup.hasBorder = false
 
         val lines = getReference("E:/Documents/Uni/Master/WS2122/tsunami/data/middle_states.csv")
             .inputStream().bufferedReader()
@@ -389,12 +387,26 @@ object FWaveSolver {
             numTests++
 
             val parts = line.split(',').map { it.toFloat() }
-            hl = parts[0]
-            hr = parts[1]
-            hul = parts[2]
-            hur = parts[3]
+            setup.heightLeft = parts[0]
+            setup.heightRight = parts[1]
+            setup.impulseLeft = parts[2]
+            setup.impulseRight = parts[3]
 
-            sim.initWithSetup(setup)
+            if (!sim.initWithSetup(setup))
+                throw RuntimeException("Failed setup")
+
+            val h0 = sim.getFluidHeightAt(halfIndex, 0)
+            val h1 = sim.getFluidHeightAt(halfIndex + 1, 0)
+            val i0 = sim.getMomentumXAt(halfIndex, 0)
+            val i1 = sim.getMomentumXAt(halfIndex + 1, 0)
+            if (h0 != setup.heightLeft || h1 != setup.heightRight ||
+                i0 != setup.impulseLeft || i1 != setup.impulseRight
+            ) {
+                val engine = sim.engine as CPUEngine
+                LOGGER.info(engine.fluidHeight.toStringInRows(sim.width + 2))
+                LOGGER.info(engine.fluidMomentumX.toStringInRows(sim.width + 2))
+                throw RuntimeException("Incorrect setup: $h0, $h1, $i0, $i1 != $setup")
+            }
 
             val hStar = parts[4]
             val targetPrecision = 0.05f * abs(hStar)
@@ -418,7 +430,10 @@ object FWaveSolver {
                     numPassed++
                     break
                 }
-                if (i == maxSteps - 1) LOGGER.warn("did not pass, got $hComputed instead of $hStar from $line, line $numTests")
+                if (i == maxSteps - 1) {
+                    LOGGER.warn("did not pass, got $hComputed instead of $hStar from $line, line $numTests")
+                    Thread.sleep(100)
+                }
             }
         }
 

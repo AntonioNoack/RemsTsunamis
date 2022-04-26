@@ -8,6 +8,7 @@ import me.anno.io.serialization.NotSerializedProperty
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.Visualisation
+import me.anno.tsunamis.engine.FWaveSolver.toStringInRows
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
@@ -63,7 +64,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         setGhostOutflow(w, h, bathymetry)
     }
 
-    fun setGhostOutflow(width: Int, height: Int, v: FloatArray) {
+    private fun setGhostOutflow(width: Int, height: Int, v: FloatArray) {
 
         // set the ghost zone to be outflow conditions
         for (y in -1..height) {
@@ -209,23 +210,23 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         fluidMomentumY.fill(0f)
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     override fun getSurfaceHeightAt(x: Int, y: Int): Float {
         val index = getIndex(x, y)
         return fluidHeight[index] + bathymetry[index]
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     override fun getFluidHeightAt(x: Int, y: Int): Float {
         return fluidHeight[getIndex(x, y)]
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     override fun getMomentumXAt(x: Int, y: Int): Float {
         return fluidMomentumX[getIndex(x, y)]
     }
 
-    @Suppress("UNUSED")
+    @Suppress("unused")
     override fun getMomentumYAt(x: Int, y: Int): Float {
         return fluidMomentumY[getIndex(x, y)]
     }

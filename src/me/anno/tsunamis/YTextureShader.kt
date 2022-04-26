@@ -22,6 +22,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                 else -> false
             }
         }
+        list.add(Variable(GLSLType.M4x3, "localTransform"))
         if (halfPrecision) {
             list.add(Variable(GLSLType.S2D, "fluidSurface"))
             list.add(Variable(GLSLType.S2D, "fluidMomentumX"))
