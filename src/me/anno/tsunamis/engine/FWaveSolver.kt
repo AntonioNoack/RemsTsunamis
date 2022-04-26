@@ -27,7 +27,8 @@ object FWaveSolver {
         huDst: FloatArray,
         gravity: Float,
         scaling: Float,
-        tmp4f: FloatArray
+        tmp4f: FloatArray,
+        minFluidHeight: Float
     ) {
 
         var h0 = hSrc[i0]
@@ -36,8 +37,8 @@ object FWaveSolver {
         var b0 = b[i0]
         var b1 = b[i1]
 
-        val wet0 = h0 > 0f
-        val wet1 = h1 > 0f
+        val wet0 = h0 > minFluidHeight
+        val wet1 = h1 > minFluidHeight
 
         if (wet0 || wet1) {
 
@@ -86,25 +87,33 @@ object FWaveSolver {
         gravity: Float,
         dst: FloatArray
     ) {
-        // println("input: $h0 $h1 $hu0 $hu1 $b0 $b1 $gravity")
+
         val roeHeight = (h0 + h1) * 0.5f
+
         val sqrt0 = sqrt(h0)
         val sqrt1 = sqrt(h1)
+
         val u0 = if (h0 > 0f) hu0 / h0 else 0f
         val u1 = if (h1 > 0f) hu1 / h1 else 0f
+
         val roeVelocity = (u0 * sqrt0 + u1 * sqrt1) / (sqrt0 + sqrt1)
         val gravityTerm = sqrt(gravity * roeHeight)
+
         val lambda0 = roeVelocity - gravityTerm
         val lambda1 = roeVelocity + gravityTerm
+
         val invDeltaLambda = 0.5f / gravityTerm
         val bathymetryTermV2 = roeHeight * (b1 - b0)
+
         val df0 = hu1 - hu0
         val df1 = hu1 * u1 - hu0 * u0 + gravity * (0.5f * (h1 * h1 - h0 * h0) + bathymetryTermV2)
+
         val deltaH0 = +(df0 * lambda1 - df1) * invDeltaLambda
         val deltaH1 = -(df0 * lambda0 - df1) * invDeltaLambda
+
         val deltaHu0 = deltaH0 * lambda0
         val deltaHu1 = deltaH1 * lambda1
-        // println("dh: $deltaH0 $deltaH1 by $df0 $df1")
+
         if (lambda0 < 0f) {// first wave to the left
             dst[0] = deltaH0
             dst[1] = deltaHu0
@@ -116,6 +125,7 @@ object FWaveSolver {
             dst[2] = deltaH0
             dst[3] = deltaHu0
         }
+
         if (lambda1 < 0f) {// second wave to the right
             dst[0] += deltaH1
             dst[1] += deltaHu1
@@ -123,10 +133,7 @@ object FWaveSolver {
             dst[2] += deltaH1
             dst[3] += deltaHu1
         }
-        if (dst.any { it.isNaN() }) {// unscientific saving the simulation
-            dst.fill(0f)
-        }
-        // if (dst.any { it.isNaN() }) throw RuntimeException("NaN from $h0 $h1, $hu0 $hu1, $b0 $b1, $gravity")
+
     }
 
     fun solve(

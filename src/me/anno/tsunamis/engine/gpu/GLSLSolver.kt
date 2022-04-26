@@ -18,13 +18,13 @@ object GLSLSolver {
 
     private const val fWaveSolverBase = "" + // memory layout: height, momentum, bathymetry
             // dry-wet boundary conditions
-            "   if(h.x <= 0.0 && h.y <= 0.0){\n" +
+            "   if(h.x <= minFluidHeight && h.y <= minFluidHeight){\n" +
             // "       h.x = 1.0, h.y = 1.0, hu.x = 0.0, hu.y = 0.0;\n" +
-            "   } else if(h.x <= 0.0){\n" +
+            "   } else if(h.x <= minFluidHeight){\n" +
             "       h.x  = h.y;\n" +
             "       b.x  = b.y;\n" +
             "       hu.x = -hu.y;\n" + // a flop?
-            "   } else if(h.y <= 0.0){\n" +
+            "   } else if(h.y <= minFluidHeight){\n" +
             "       h.y  = h.x;\n" +
             "       b.y  = b.x;\n" +
             "       hu.y = -hu.x;\n" +
@@ -48,7 +48,7 @@ object GLSLSolver {
     const val fWaveSolverHalf = "" +
             "vec2 solveXY(vec3 data0, vec3 data1){\n" +
             fWaveSolverParams +
-            "   if(h.x <= 0.0 || h.y <= 0.0) return vec2(0);\n" + // on land
+            "   if(h.x <= minFluidHeight || h.y <= minFluidHeight) return vec2(0);\n" + // on land
             fWaveSolverBase + // 39 flops
             "   vec2 dst = vec2(0.0);\n" +
             "   if(lambda.x < 0.0){\n" +
@@ -79,7 +79,7 @@ object GLSLSolver {
 
     const val fWaveSolverFull = fWaveSolverHalf + "vec4 solve(vec3 data0, vec3 data1){\n" +
             fWaveSolverParams +
-            "   if(h.x <= 0.0 || h.y <= 0.0) return vec4(0);\n" + // on land
+            "   if(h.x <= minFluidHeight || h.y <= minFluidHeight) return vec4(0);\n" + // on land
             fWaveSolverBase + // 39 flops
             "   vec2 dst1 = vec2(0.0);\n" +
             "   if(lambda.x < 0.0){\n" +

@@ -3,29 +3,24 @@ package me.anno.tsunamis.engine.gpu
 import me.anno.gpu.GFX
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
-import me.anno.gpu.texture.Clamping
-import me.anno.gpu.texture.GPUFiltering
 import me.anno.gpu.texture.Texture2D
-import me.anno.tsunamis.engine.gpu.GraphicsEngine.Companion.synchronizeGraphics
 import org.joml.Vector2i
-import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
-import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
 class ComputeYXEngine(width: Int, height: Int) :
     ComputeEngine(width, height) {
 
-    override fun step(gravity: Float, scaling: Float) {
+    override fun step(gravity: Float, scaling: Float, minFluidHeight: Float) {
         GFX.checkIsGFXThread()
-        step(shaders.first, gravity, scaling, src, tmp)
-        step(shaders.second, gravity, scaling, tmp, src)
+        step(shaders.first, gravity, scaling, minFluidHeight, src, tmp)
+        step(shaders.second, gravity, scaling, minFluidHeight, tmp, src)
     }
 
-    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+    override fun halfStep(gravity: Float, scaling: Float, minFluidHeight: Float, x: Boolean) {
         GFX.checkIsGFXThread()
         if (x) {
-            step(shaders.first, gravity, scaling, src, tmp)
+            step(shaders.first, gravity, scaling, minFluidHeight, src, tmp)
         } else {
-            step(shaders.second, gravity, scaling, tmp, src)
+            step(shaders.second, gravity, scaling, minFluidHeight, tmp, src)
         }
     }
 
@@ -42,6 +37,7 @@ class ComputeYXEngine(width: Int, height: Int) :
                         "uniform ivec2 maxUV;\n" +
                         "uniform float timeScale;\n" +
                         "uniform float gravity;\n" +
+                        "uniform float minFluidHeight;\n" +
                         GLSLSolver.fWaveSolverHalf +
                         "void main(){\n" +
                         "   ivec2 uv1 = ivec2(gl_GlobalInvocationID.yx);\n" +
@@ -61,11 +57,12 @@ class ComputeYXEngine(width: Int, height: Int) :
 
         private val shaders by lazy { Pair(createShader(true), createShader(false)) }
 
-        private fun step(shader: ComputeShader, gravity: Float, timeScale: Float, src: Texture2D, dst: Texture2D) {
+        private fun step(
+            shader: ComputeShader, gravity: Float, timeScale: Float, minFluidHeight: Float,
+            src: Texture2D, dst: Texture2D
+        ) {
             shader.use()
-            shader.v1f("timeScale", timeScale)
-            shader.v1f("gravity", gravity)
-            shader.v2i("maxUV", src.w - 1, src.h - 1)
+            initShader(shader, timeScale, gravity, minFluidHeight, src)
             ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
             ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
             shader.runBySize(src.h, src.w)

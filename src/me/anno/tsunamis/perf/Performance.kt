@@ -168,6 +168,7 @@ fun main(args: Array<String>) {
     val testDurationSeconds = loaded.config.getOrDefault("testDurationSeconds", 10.0)
     val cflFactor = loaded.cflFactor
     val gravity = loaded.gravity
+    val minFluidHeight = loaded.minFluidHeight
 
     val speeds = ArrayList<Double>()
 
@@ -190,20 +191,20 @@ fun main(args: Array<String>) {
         waitUntil(true) { setup.isReady() }
 
         val engine = type.create(width, height)
-        engine.init(null, setup, gravity)
+        engine.init(null, setup, gravity, minFluidHeight)
 
         // step a few iterations
-        val scaling = cflFactor / engine.computeMaxVelocity(gravity)
+        val scaling = cflFactor / engine.computeMaxVelocity(gravity, minFluidHeight)
         engine.synchronize()
 
         // compile the shaders & such
-        engine.step(gravity, scaling)
+        engine.step(gravity, scaling, minFluidHeight)
 
         // guess the performance
         engine.synchronize()
         val t0 = System.nanoTime()
         for (i in 0 until warmupIterations) {
-            engine.step(gravity, scaling)
+            engine.step(gravity, scaling, minFluidHeight)
         }
         engine.synchronize()
         val t1 = System.nanoTime()
@@ -216,7 +217,7 @@ fun main(args: Array<String>) {
         // run performance measurements
         val t2 = System.nanoTime()
         for (i in 0 until numIterations) {
-            engine.step(gravity, scaling)
+            engine.step(gravity, scaling, minFluidHeight)
         }
         engine.synchronize()
         val t3 = System.nanoTime()
@@ -226,12 +227,12 @@ fun main(args: Array<String>) {
             val numIterations2 = max(1, numIterations / 5)
             val t4 = System.nanoTime()
             for (i in 0 until numIterations2) {
-                engine.halfStep(gravity, scaling, true)
+                engine.halfStep(gravity, scaling, minFluidHeight, true)
             }
             engine.synchronize()
             val t5 = System.nanoTime()
             for (i in 0 until numIterations2) {
-                engine.halfStep(gravity, scaling, false)
+                engine.halfStep(gravity, scaling, minFluidHeight, false)
             }
             engine.synchronize()
             val t6 = System.nanoTime()

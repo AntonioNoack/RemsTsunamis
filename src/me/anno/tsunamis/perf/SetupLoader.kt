@@ -14,12 +14,13 @@ object SetupLoader {
 
     private val LOGGER = LogManager.getLogger(SetupLoader::class)
 
-    class Setup(
+    data class Setup(
         val width: Int,
         val height: Int,
         val gravity: Float,
         val cellSizeMeters: Float,
         val cflFactor: Float,
+        val minFluidHeight: Float,
         val setup: FluidSimSetup,
         val config: YAMLNode?
     )
@@ -90,6 +91,8 @@ object SetupLoader {
 
         var scale = 1f
 
+        var minFluidHeight = 1e-7f
+
         // the first param is the config
         if (file.exists && !file.isDirectory) try {
 
@@ -113,6 +116,8 @@ object SetupLoader {
 
             gravity = config.getOrDefault("gravity", gravity)
             cfl = config.getOrDefault("cflFactor", cfl)
+
+            minFluidHeight = config.getOrDefault("minFluidHeight", minFluidHeight)
 
             scale = config.getOrDefault("scale", 1f)
 
@@ -210,7 +215,7 @@ object SetupLoader {
             height = (setup.getPreferredNumCellsY() * scale).toInt()
         }
 
-        return Setup(width, height, gravity, cellSizeMeters, cfl, setup, config)
+        return Setup(width, height, gravity, cellSizeMeters, cfl, minFluidHeight, setup, config)
 
     }
 

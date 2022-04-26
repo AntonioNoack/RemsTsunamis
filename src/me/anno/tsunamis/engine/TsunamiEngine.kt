@@ -22,11 +22,11 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     var bathymetry: FloatArray = f0
 
-    abstract fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float)
+    abstract fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float, minFluidHeight: Float)
 
-    open fun step(gravity: Float, scaling: Float) {
-        halfStep(gravity, scaling, true)
-        halfStep(gravity, scaling, false)
+    open fun step(gravity: Float, scaling: Float, minFluidHeight: Float) {
+        halfStep(gravity, scaling, minFluidHeight, true)
+        halfStep(gravity, scaling, minFluidHeight, false)
     }
 
     open fun isCompatible(engine: TsunamiEngine): Boolean {
@@ -36,7 +36,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     abstract fun setFromTextureRGBA32F(texture: Texture2D)
 
-    abstract fun halfStep(gravity: Float, scaling: Float, x: Boolean)
+    abstract fun halfStep(gravity: Float, scaling: Float, minFluidHeight: Float, x: Boolean)
 
     abstract fun supportsAsyncCompute(): Boolean
 
@@ -60,7 +60,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
 
     abstract fun getMomentumYAt(x: Int, y: Int): Float
 
-    abstract fun computeMaxVelocity(gravity: Float): Float
+    abstract fun computeMaxVelocity(gravity: Float, minFluidHeight: Float): Float
 
     open fun updateStatistics(sim: FluidSim) {}
 
@@ -181,36 +181,6 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             val lx = Maths.clamp(x + 1, 0, width + 1)
             val ly = Maths.clamp(y + 1, 0, height + 1)
             return lx + ly * (width + 2)
-        }
-
-        fun computeMaxVelocity(
-            width: Int, height: Int, h: FloatArray, hu: FloatArray,
-            hv: FloatArray, gravity: Float
-        ): Float {
-            var maxVelocity = 0f
-            // check for out of bounds conditions
-            h[getIndex(-1, -1, width, height)]
-            h[getIndex(width, height, width, height)]
-            FluidSim.threadPool.processBalanced(0, height, true) { y0, y1 ->
-                var maxVelocityI = 0f
-                for (y in y0 until y1) {
-                    var index = getIndex(0, y, width, height)
-                    for (x in 0 until width) {
-                        val hi = h[index]
-                        if (hi > 0f) {
-                            val impulse = max(abs(hu[index]), abs(hv[index]))
-                            val velocity = impulse / hi
-                            val expectedVelocity = velocity + sqrt(gravity * hi)
-                            if (expectedVelocity > maxVelocityI) maxVelocityI = expectedVelocity
-                        }
-                        index++
-                    }
-                }
-                synchronized(FluidSim.threadPool) {
-                    maxVelocity = max(maxVelocity, maxVelocityI)
-                }
-            }
-            return maxVelocity
         }
 
         private fun getWaterColor(height: Float): Int {

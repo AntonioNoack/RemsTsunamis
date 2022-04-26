@@ -62,6 +62,7 @@ class Compute16Shaders private constructor(bathymetryHalf: Boolean) {
                     "uniform ivec2 maxUV;\n" +
                     "uniform float timeScale;\n" +
                     "uniform float gravity;\n" +
+                    "uniform float minFluidHeight;\n" +
                     GLSLSolver.fWaveSolverHalf +
                     "vec3 load(ivec2 uv){\n" +
                     "   float surface  = imageLoad(srcSurface, uv).x;\n" +

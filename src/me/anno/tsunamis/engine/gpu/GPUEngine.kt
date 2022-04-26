@@ -2,8 +2,10 @@ package me.anno.tsunamis.engine.gpu
 
 import me.anno.gpu.GFX
 import me.anno.gpu.framebuffer.Framebuffer
+import me.anno.gpu.shader.OpenGLShader
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.GPUFiltering
+import me.anno.gpu.texture.ITexture2D
 import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
@@ -26,10 +28,10 @@ abstract class GPUEngine<Buffer>(
 
     private var maxVelocity = 0f
 
-    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float) {
+    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float, minFluidHeight: Float) {
         GFX.checkIsGFXThread()
-        super.init(sim, setup, gravity)
-        maxVelocity = super.computeMaxVelocity(gravity)
+        super.init(sim, setup, gravity, minFluidHeight)
+        maxVelocity = super.computeMaxVelocity(gravity, minFluidHeight)
         if (sim != null) super.updateStatistics(sim)
         uploadMainBuffer()
         createBuffer(tmp)
@@ -42,7 +44,7 @@ abstract class GPUEngine<Buffer>(
         fbPool.returnBuffer(buffer)
     }
 
-    abstract override fun step(gravity: Float, scaling: Float)
+    abstract override fun step(gravity: Float, scaling: Float, minFluidHeight: Float)
 
     override fun setZero() {
         GFX.checkIsGFXThread()
@@ -64,7 +66,7 @@ abstract class GPUEngine<Buffer>(
         sim.maxMomentumY = reduced.y*/
     }
 
-    override fun computeMaxVelocity(gravity: Float): Float {
+    override fun computeMaxVelocity(gravity: Float, minFluidHeight: Float): Float {
         return maxVelocity
     }
 
@@ -75,6 +77,7 @@ abstract class GPUEngine<Buffer>(
     }
 
     companion object {
+
         fun initTextures(fb: Framebuffer) {
             fb.autoUpdateMipmaps = false
             fb.ensure()
@@ -88,5 +91,13 @@ abstract class GPUEngine<Buffer>(
             tex.filtering = GPUFiltering.TRULY_NEAREST
             tex.clamping = Clamping.CLAMP
         }
+
+        fun initShader(shader: OpenGLShader, timeScale: Float, gravity: Float, minFluidHeight: Float, src: ITexture2D) {
+            shader.v1f("timeScale", timeScale)
+            shader.v1f("gravity", gravity)
+            shader.v1f("minFluidHeight", minFluidHeight)
+            shader.v2i("maxUV", src.w - 1, src.h - 1)
+        }
+
     }
 }

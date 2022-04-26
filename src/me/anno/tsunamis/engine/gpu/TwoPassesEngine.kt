@@ -6,37 +6,33 @@ import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
 import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
-import me.anno.tsunamis.engine.gpu.ComputeEngine.Companion.createTexture
-import me.anno.tsunamis.engine.gpu.GraphicsEngine.Companion.synchronizeGraphics
 import me.anno.tsunamis.setups.FluidSimSetup
 import me.anno.utils.types.Booleans.toInt
 import org.joml.Vector2i
-import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
-import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
 class TwoPassesEngine(width: Int, height: Int) : ComputeEngine(width, height) {
 
     private val delta = createTexture("delta", width + 1, height + 1)
 
-    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float) {
-        super.init(sim, setup, gravity)
+    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float, minFluidHeight: Float) {
+        super.init(sim, setup, gravity, minFluidHeight)
         createBuffer(delta)
     }
 
-    override fun step(gravity: Float, scaling: Float) {
+    override fun step(gravity: Float, scaling: Float, minFluidHeight: Float) {
         GFX.checkIsGFXThread()
         renderPurely {
-            step(shaders0.first, shaders1.first, true, gravity, scaling, src, delta, tmp)
-            step(shaders0.second, shaders1.second, false, gravity, scaling, tmp, delta, src)
+            step(shaders0.first, shaders1.first, true, gravity, scaling, minFluidHeight, src, delta, tmp)
+            step(shaders0.second, shaders1.second, false, gravity, scaling, minFluidHeight, tmp, delta, src)
         }
     }
 
-    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+    override fun halfStep(gravity: Float, scaling: Float, minFluidHeight: Float, x: Boolean) {
         renderPurely {
             if (x) {
-                step(shaders0.first, shaders1.first, x, gravity, scaling, src, delta, tmp)
+                step(shaders0.first, shaders1.first, x, gravity, scaling, minFluidHeight, src, delta, tmp)
             } else {
-                step(shaders0.second, shaders1.second, x, gravity, scaling, tmp, delta, src)
+                step(shaders0.second, shaders1.second, x, gravity, scaling, minFluidHeight, tmp, delta, src)
             }
         }
     }
@@ -58,6 +54,7 @@ class TwoPassesEngine(width: Int, height: Int) : ComputeEngine(width, height) {
                         "uniform ivec2 maxUVIn, maxUVOut;\n" +
                         "uniform float timeScale;\n" +
                         "uniform float gravity;\n" +
+                        "uniform float minFluidHeight;\n" +
                         GLSLSolver.fWaveSolverFull +
                         "void main(){\n" +
                         "   ivec2 uv1 = ivec2(gl_GlobalInvocationID.xy);\n" +
@@ -108,13 +105,13 @@ class TwoPassesEngine(width: Int, height: Int) : ComputeEngine(width, height) {
             isX: Boolean,
             gravity: Float,
             timeScale: Float,
+            minFluidHeight: Float,
             src: Texture2D,
             tmp: Texture2D,
             dst: Texture2D
         ) {
             shader0.use()
-            shader0.v1f("timeScale", timeScale)
-            shader0.v1f("gravity", gravity)
+            initShader(shader0, timeScale, gravity, minFluidHeight, src)
             shader0.v2i("maxUVIn", src.w - 1, src.h - 1)
             shader0.v2i("maxUVOut", src.w - 1 + isX.toInt(), src.h - 1 + (!isX).toInt())
             ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)

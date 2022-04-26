@@ -29,18 +29,18 @@ open class ComputeEngine(width: Int, height: Int) :
         buffer.destroy()
     }
 
-    override fun step(gravity: Float, scaling: Float) {
+    override fun step(gravity: Float, scaling: Float, minFluidHeight: Float) {
         GFX.checkIsGFXThread()
-        step(shaders.first, gravity, scaling, src, tmp)
-        step(shaders.second, gravity, scaling, tmp, src)
+        step(shaders.first, gravity, scaling, minFluidHeight, src, tmp)
+        step(shaders.second, gravity, scaling, minFluidHeight, tmp, src)
     }
 
-    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+    override fun halfStep(gravity: Float, scaling: Float, minFluidHeight: Float, x: Boolean) {
         GFX.checkIsGFXThread()
         if (x) {
-            step(shaders.first, gravity, scaling, src, tmp)
+            step(shaders.first, gravity, scaling, minFluidHeight, src, tmp)
         } else {
-            step(shaders.second, gravity, scaling, tmp, src)
+            step(shaders.second, gravity, scaling, minFluidHeight, tmp, src)
         }
     }
 
@@ -114,6 +114,7 @@ open class ComputeEngine(width: Int, height: Int) :
                         "uniform ivec2 maxUV;\n" +
                         "uniform float timeScale;\n" +
                         "uniform float gravity;\n" +
+                        "uniform float minFluidHeight;\n" +
                         GLSLSolver.fWaveSolverHalf +
                         "void main(){\n" +
                         "   ivec2 uv1 = ivec2(gl_GlobalInvocationID.xy);\n" +
@@ -133,11 +134,12 @@ open class ComputeEngine(width: Int, height: Int) :
 
         private val shaders by lazy { Pair(createShader(true), createShader(false)) }
 
-        private fun step(shader: ComputeShader, gravity: Float, timeScale: Float, src: Texture2D, dst: Texture2D) {
+        private fun step(
+            shader: ComputeShader, gravity: Float, timeScale: Float, minFluidHeight: Float,
+            src: Texture2D, dst: Texture2D
+        ) {
             shader.use()
-            shader.v1f("timeScale", timeScale)
-            shader.v1f("gravity", gravity)
-            shader.v2i("maxUV", src.w - 1, src.h - 1)
+            initShader(shader, timeScale, gravity, minFluidHeight, src)
             ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
             ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
             shader.runBySize(src.w, src.h)

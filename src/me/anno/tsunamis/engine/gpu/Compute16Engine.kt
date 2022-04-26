@@ -10,6 +10,7 @@ import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.TsunamiEngine
 import me.anno.tsunamis.engine.gpu.Compute16Shaders.Companion.b16Shaders
 import me.anno.tsunamis.engine.gpu.Compute16Shaders.Companion.b32Shaders
+import me.anno.tsunamis.engine.gpu.GPUEngine.Companion.initShader
 import me.anno.tsunamis.engine.gpu.GPUEngine.Companion.initTexture
 import me.anno.tsunamis.engine.gpu.GraphicsEngine.Companion.synchronizeGraphics
 import me.anno.tsunamis.setups.FluidSimSetup
@@ -51,8 +52,8 @@ class Compute16Engine(
     private val momentumY0 = Texture2D("my16-0", width, height, 1)
     private val momentumY1 = Texture2D("my16-1", width, height, 1)
 
-    val momentumX get() = if(isEvenIteration) momentumX0 else momentumX1
-    val momentumY get() = if(isEvenIteration) momentumY0 else momentumY1
+    val momentumX get() = if (isEvenIteration) momentumX0 else momentumX1
+    val momentumY get() = if (isEvenIteration) momentumY0 else momentumY1
 
     // can be replaced, if we adjust our render shader
     private val rendered = Texture2D("rend16", width, height, 1)
@@ -69,12 +70,12 @@ class Compute16Engine(
     override fun supportsAsyncCompute(): Boolean = false
     override fun supportsMesh(): Boolean = false
     override fun supportsTexture(): Boolean = true
-    override fun computeMaxVelocity(gravity: Float): Float = maxVelocity
+    override fun computeMaxVelocity(gravity: Float, minFluidHeight: Float): Float = maxVelocity
 
-    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float) {
+    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float, minFluidHeight: Float) {
 
-        super.init(sim, setup, gravity)
-        maxVelocity = super.computeMaxVelocity(gravity)
+        super.init(sim, setup, gravity, minFluidHeight)
+        maxVelocity = super.computeMaxVelocity(gravity, minFluidHeight)
         if (sim != null) super.updateStatistics(sim)
 
         val buffer = fbPool[width * height * 4, false]
@@ -132,21 +133,21 @@ class Compute16Engine(
         rendered.destroy()
     }
 
-    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+    override fun halfStep(gravity: Float, scaling: Float, minFluidHeight: Float, x: Boolean) {
         val shaders = shaders.updateShaders
         if (x) {
             step(
                 shaders.first,
                 surface0, if (isEvenIteration) momentumX0 else momentumX1,
                 surface1, if (isEvenIteration) momentumX1 else momentumX0,
-                bathymetryTex, bathymetryFp16, gravity, scaling
+                bathymetryTex, bathymetryFp16, gravity, scaling, minFluidHeight
             )
         } else {
             step(
                 shaders.second,
                 surface1, if (isEvenIteration) momentumY0 else momentumY1,
                 surface0, if (isEvenIteration) momentumY1 else momentumY0,
-                bathymetryTex, bathymetryFp16, gravity, scaling
+                bathymetryTex, bathymetryFp16, gravity, scaling, minFluidHeight
             )
             isEvenIteration = !isEvenIteration
         }
@@ -212,12 +213,11 @@ class Compute16Engine(
             bathymetry: Texture2D,
             bathymetryHalf: Boolean,
             gravity: Float,
-            timeScale: Float
+            timeScale: Float,
+            minFluidHeight: Float
         ) {
             shader.use()
-            shader.v1f("gravity", gravity)
-            shader.v1f("timeScale", timeScale)
-            shader.v2i("maxUV", srcSurface.w - 1, srcSurface.h - 1)
+            initShader(shader, timeScale, gravity, minFluidHeight, srcSurface)
             ComputeShader.bindTexture(0, srcSurface, ComputeTextureMode.READ, GL_R16F)
             ComputeShader.bindTexture(1, srcMomentum, ComputeTextureMode.READ, GL_R16F)
             ComputeShader.bindTexture(2, dstSurface, ComputeTextureMode.WRITE, GL_R16F)

@@ -8,17 +8,19 @@ import me.anno.io.serialization.NotSerializedProperty
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.Visualisation
-import me.anno.tsunamis.engine.FWaveSolver.toStringInRows
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
 import me.anno.utils.pooling.FloatArrayPool
+import org.apache.logging.log4j.LogManager
 import org.lwjgl.opengl.GL11C.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
@@ -43,7 +45,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
     @NotSerializedProperty
     private var tmpHuY = FluidSim.f0
 
-    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float) {
+    override fun init(sim: FluidSim?, setup: FluidSimSetup, gravity: Float, minFluidHeight: Float) {
         val w = width
         val h = height
         val targetSize = (w + 2) * (h + 2)
@@ -126,7 +128,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
     }
 
-    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+    override fun halfStep(gravity: Float, scaling: Float, minFluidHeight: Float, x: Boolean) {
 
         val width = width
         val height = height
@@ -150,7 +152,10 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
                 for (y in y0 until y1) {
                     var index0 = getIndex(-1, y)
                     for (xi in -1 until width) {
-                        FWaveSolver.solve(index0, index0 + 1, h0, hu0, b, h1, hu1, gravity, scaling, tmp4f)
+                        FWaveSolver.solve(
+                            index0, index0 + 1, h0, hu0, b, h1, hu1,
+                            gravity, scaling, tmp4f, minFluidHeight
+                        )
                         index0++
                     }
                 }
@@ -176,7 +181,10 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
                 for (y in y0 until y1) {
                     var index0 = getIndex(0, y)
                     for (xi in 0 until width) {
-                        FWaveSolver.solve(index0, index0 + stride, h1, hv1, b, h2, hv2, gravity, scaling, tmp4f)
+                        FWaveSolver.solve(
+                            index0, index0 + stride, h1, hv1, b, h2, hv2,
+                            gravity, scaling, tmp4f, minFluidHeight
+                        )
                         index0++
                     }
                 }
@@ -231,8 +239,41 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         return fluidMomentumY[getIndex(x, y)]
     }
 
-    override fun computeMaxVelocity(gravity: Float): Float {
-        return computeMaxVelocity(width, height, fluidHeight, fluidMomentumX, fluidMomentumY, gravity)
+    override fun computeMaxVelocity(gravity: Float, minFluidHeight: Float): Float {
+        val h = fluidHeight
+        val hu = fluidMomentumX
+        val hv = fluidMomentumY
+        val width = width
+        val height = height
+        var maxVelocity = 0f
+        // check for out of bounds conditions
+        h[getIndex(width, height, width, height)]
+        threadPool.processBalanced(0, height, true) { y0, y1 ->
+            var maxVelocityI = 0f
+            for (y in y0 until y1) {
+                var index = getIndex(0, y, width, height)
+                @Suppress("unused")
+                for (x in 0 until width) {
+                    val fluidHeight = h[index]
+                    if (fluidHeight > minFluidHeight) {
+                        val impulse = max(abs(hu[index]), abs(hv[index]))
+                        val velocity = impulse / fluidHeight
+                        val expectedVelocity = velocity + sqrt(gravity * fluidHeight)
+                        if (expectedVelocity > maxVelocityI) {
+                            /*if (expectedVelocity > 1e6) {
+                                LOGGER.warn("Huge velocity at $x,$y from h: $fluidHeight, i: $impulse -> v: $velocity, exp-v: $expectedVelocity")
+                            }*/
+                            maxVelocityI = expectedVelocity
+                        }
+                    }
+                    index++
+                }
+            }
+            synchronized(threadPool) {
+                maxVelocity = max(maxVelocity, maxVelocityI)
+            }
+        }
+        return maxVelocity
     }
 
     override fun supportsMesh(): Boolean = true
@@ -279,6 +320,9 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
     }
 
     companion object {
+
+        @Suppress("unused")
+        private val LOGGER = LogManager.getLogger(CPUEngine::class)
 
         val fbPool = FloatArrayPool(8, true)
 

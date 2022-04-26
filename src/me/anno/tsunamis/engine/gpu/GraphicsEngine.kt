@@ -10,6 +10,7 @@ import me.anno.gpu.shader.Renderer
 import me.anno.gpu.shader.Shader
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.GPUFiltering
+import me.anno.gpu.texture.ITexture2D
 import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
 import org.lwjgl.opengl.GL11
@@ -42,20 +43,20 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
         ComputeEngine.copyTextureRGBA32F(texture, this.src.getTexture0() as Texture2D)
     }
 
-    override fun step(gravity: Float, scaling: Float) {
+    override fun step(gravity: Float, scaling: Float, minFluidHeight: Float) {
         GFX.checkIsGFXThread()
         renderPurely {
-            step(shaders.first, src, tmp, gravity, scaling)
-            step(shaders.second, tmp, src, gravity, scaling)
+            step(shaders.first, src, tmp, gravity, scaling, minFluidHeight)
+            step(shaders.second, tmp, src, gravity, scaling, minFluidHeight)
         }
     }
 
-    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+    override fun halfStep(gravity: Float, scaling: Float, minFluidHeight: Float, x: Boolean) {
         renderPurely {
             if (x) {
-                step(shaders.first, src, tmp, gravity, scaling)
+                step(shaders.first, src, tmp, gravity, scaling, minFluidHeight)
             } else {
-                step(shaders.second, tmp, src, gravity, scaling)
+                step(shaders.second, tmp, src, gravity, scaling, minFluidHeight)
             }
         }
     }
@@ -95,6 +96,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
                         "uniform ivec2 maxUV;\n" +
                         "uniform float timeScale;\n" +
                         "uniform float gravity;\n" +
+                        "uniform float minFluidHeight;\n" +
                         GLSLSolver.fWaveSolverHalf +
                         // "(layout = 0) out vec4 gl_FragColor;\n" +
                         "void main(){\n" +
@@ -116,13 +118,19 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
 
         private val shaders by lazy { Pair(createShader(true), createShader(false)) }
 
-        private fun step(shader: Shader, src: Framebuffer, dst: Framebuffer, gravity: Float, timeScale: Float) {
+        private fun step(
+            shader: Shader, src: Framebuffer, dst: Framebuffer,
+            gravity: Float, timeScale: Float, minFluidHeight: Float
+        ) = step(shader, src.getTexture0(), dst, gravity, timeScale, minFluidHeight)
+
+        private fun step(
+            shader: Shader, src: ITexture2D, dst: Framebuffer,
+            gravity: Float, timeScale: Float, minFluidHeight: Float
+        ) {
             useFrame(dst, Renderer.copyRenderer) {
                 shader.use()
-                shader.v1f("gravity", gravity)
-                shader.v1f("timeScale", timeScale)
-                shader.v2i("maxUV", src.w - 1, src.h - 1)
-                src.bindTexture0(0, GPUFiltering.TRULY_NEAREST, Clamping.CLAMP)
+                initShader(shader, timeScale, gravity, minFluidHeight, src)
+                src.bind(0, GPUFiltering.TRULY_NEAREST, Clamping.CLAMP)
                 GFX.flat01.draw(shader)
             }
         }

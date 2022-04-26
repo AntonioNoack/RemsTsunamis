@@ -388,13 +388,13 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             GFX.check()
 
             try {
-                newEngine.init(this, setup, gravity)
+                newEngine.init(this, setup, gravity, minFluidHeight)
             } catch (e: Exception) {
                 // fallback
                 e.printStackTrace()
                 newEngine = CPUEngine(w, h)
                 this.engine = newEngine
-                newEngine.init(this, setup, gravity)
+                newEngine.init(this, setup, gravity, minFluidHeight)
             }
 
             GFX.check()
@@ -741,14 +741,21 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @SerializedProperty
     var synchronize = false
 
+    var minFluidHeight = 0.01f
+
     fun computeStep(scaling: Float) {
         val engine = engine ?: return
-        engine.step(gravity, scaling)
+        engine.step(gravity, scaling, minFluidHeight)
         if (synchronize) engine.synchronize()
     }
 
-    fun computeMaxTimeStep(): Float {
-        val maxVelocity = engine!!.computeMaxVelocity(gravity)
+    @DebugProperty
+    @NotSerializedProperty
+    var maxVelocity = 0f
+
+    private fun computeMaxTimeStep(): Float {
+        val maxVelocity = engine!!.computeMaxVelocity(gravity, minFluidHeight)
+        this.maxVelocity = maxVelocity
         val is2D = width > 1 || height > 1
         val cflFactor = if (is2D) cfl2d else 0.5f
         return cflFactor * cellSizeMeters / maxVelocity

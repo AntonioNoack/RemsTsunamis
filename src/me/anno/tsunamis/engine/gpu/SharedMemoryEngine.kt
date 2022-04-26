@@ -4,32 +4,27 @@ import me.anno.gpu.GFX
 import me.anno.gpu.OpenGL.renderPurely
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
-import me.anno.gpu.texture.Clamping
-import me.anno.gpu.texture.GPUFiltering
 import me.anno.gpu.texture.Texture2D
 import me.anno.maths.Maths.ceilDiv
-import me.anno.tsunamis.engine.gpu.GraphicsEngine.Companion.synchronizeGraphics
 import org.joml.Vector2i
-import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
-import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
 class SharedMemoryEngine(width: Int, height: Int) :
     ComputeEngine(width, height) {
 
-    override fun step(gravity: Float, scaling: Float) {
+    override fun step(gravity: Float, scaling: Float, minFluidHeight: Float) {
         GFX.checkIsGFXThread()
         renderPurely {
-            step(shaders.first, true, gravity, scaling, src, tmp)
-            step(shaders.second, false, gravity, scaling, tmp, src)
+            step(shaders.first, true, gravity, scaling, minFluidHeight, src, tmp)
+            step(shaders.second, false, gravity, scaling, minFluidHeight, tmp, src)
         }
     }
 
-    override fun halfStep(gravity: Float, scaling: Float, x: Boolean) {
+    override fun halfStep(gravity: Float, scaling: Float, minFluidHeight: Float, x: Boolean) {
         renderPurely {
             if (x) {
-                step(shaders.first, true, gravity, scaling, src, tmp)
+                step(shaders.first, true, gravity, scaling, minFluidHeight, src, tmp)
             } else {
-                step(shaders.second, false, gravity, scaling, tmp, src)
+                step(shaders.second, false, gravity, scaling, minFluidHeight, tmp, src)
             }
         }
     }
@@ -50,6 +45,7 @@ class SharedMemoryEngine(width: Int, height: Int) :
                         "uniform ivec2 maxUV;\n" +
                         "uniform float timeScale;\n" +
                         "uniform float gravity;\n" +
+                        "uniform float minFluidHeight;\n" +
                         GLSLSolver.fWaveSolverFull +
                         "shared vec4 updates[$updateSize * $updateSize];\n" +
                         "void main(){\n" +
@@ -83,13 +79,12 @@ class SharedMemoryEngine(width: Int, height: Int) :
             x: Boolean,
             gravity: Float,
             timeScale: Float,
+            minFluidHeight: Float,
             src: Texture2D,
             dst: Texture2D
         ) {
             shader.use()
-            shader.v1f("timeScale", timeScale)
-            shader.v1f("gravity", gravity)
-            shader.v2i("maxUV", src.w - 1, src.h - 1)
+            initShader(shader, timeScale, gravity, minFluidHeight, src)
             ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
             ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
             if (x) {

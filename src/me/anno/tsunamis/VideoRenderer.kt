@@ -57,6 +57,8 @@ object VideoRenderer {
         val cflFactor = fullSetup.cflFactor
         val gravity = fullSetup.gravity
 
+        val minFluidHeight = fullSetup.minFluidHeight
+
         val w = fullSetup.width
         val h = fullSetup.height
         val numFrames = config.getOrDefault("numFrames", 500)
@@ -97,11 +99,11 @@ object VideoRenderer {
         val maxMomentum = config.getOrDefault("maxMomentum", 100f)
 
         waitUntil(true) { setup.isReady() }
-        engine.init(null, setup, gravity)
+        engine.init(null, setup, gravity, minFluidHeight)
 
         LOGGER.info("Preferred size: ${setup.getPreferredNumCellsX()} x ${setup.getPreferredNumCellsY()}")
 
-        val scaling = cflFactor / engine.computeMaxVelocity(gravity)
+        val scaling = cflFactor / engine.computeMaxVelocity(gravity, minFluidHeight)
 
         val maxFluidHeight = getMaxValue(w, h, 1, engine.fluidHeight, engine.bathymetry)
 
@@ -109,7 +111,7 @@ object VideoRenderer {
         val srcFB = Framebuffer("src", outputWidth, outputHeight, 1, 1, true, DepthBufferType.NONE)
         renderVideo(outputWidth, outputHeight, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB) { callback ->
             for (i in 0 until numStepsPerFrame) {
-                engine.step(gravity, scaling)
+                engine.step(gravity, scaling, minFluidHeight)
             }
             // maxValues.max(Reduction.reduce(engine.src, Reduction.MAX_RA))
             useFrame(srcFB) {
