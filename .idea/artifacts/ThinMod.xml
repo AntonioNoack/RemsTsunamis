@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="ThinMod">
+    <output-path>$PROJECT_DIR$/out/artifacts/ThinMod</output-path>
+    <root id="archive" name="RemsTsunamis.jar">
+      <element id="module-output" name="RemsTsunamis" />
+    </root>
+  </artifact>
+</component>

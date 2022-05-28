@@ -2,6 +2,7 @@ package me.anno.tsunamis.engine
 
 import me.anno.ecs.components.mesh.ProceduralMesh
 import me.anno.ecs.components.mesh.terrain.TerrainUtils
+import me.anno.gpu.pipeline.CullMode
 import me.anno.gpu.texture.Texture2D
 import me.anno.maths.Maths
 import me.anno.tsunamis.FluidSim
@@ -12,10 +13,8 @@ import me.anno.tsunamis.Visualisation
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
 import org.joml.Vector3f
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sqrt
 
 @Suppress("unused")
 abstract class TsunamiEngine(val width: Int, val height: Int) {
@@ -100,15 +99,16 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
     fun createBathymetryMesh(
         w: Int, h: Int, cw: Int, ch: Int, scale: Int, cellSize: Float,
         colorMap: ColorMap?, colorMapScale: Float,
-        flipBathymetryNormal: Boolean, mesh: ProceduralMesh
+        culling: CullMode, mesh: ProceduralMesh
     ) {
         val bathymetry = bathymetry
-        val normalY = cellSize * 2f * (if (flipBathymetryNormal) -1f else +1f)
+        val normalY = cellSize * 2f * (if (culling == CullMode.BACK) -1f else +1f)
         val invCMScale = 1f / colorMapScale
+        val mesh2 = mesh.getMesh()
         TerrainUtils.generateRegularQuadHeightMesh(
             cw - 2, ch - 2, 1 + cw, cw,
-            flipBathymetryNormal,
-            cellSize, mesh.mesh2,
+            culling == CullMode.BACK, // todo why is this not flipping the order?
+            cellSize, mesh2,
             object : TerrainUtils.HeightMap {
                 override fun get(it: Int): Float {
                     val i = coarseIndexToFine(w, h, cw, ch, it)
@@ -134,23 +134,37 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                 }
             }
         )
-        // todo why is this not working directly???...
-        val mesh1 = mesh.mesh2
-        mesh1.indices!!.flipIndices()
+        if (culling == CullMode.BACK) {
+            // todo neither disabling nor enabling it works... this is cursed...
+            // todo is something changing the order???
+            mesh2.indices!!.reverse()
+        }
+        if (culling == CullMode.BOTH) {
+            // add inverse positions, normals and indices
+            val oldPos = mesh2.positions!!
+            val oldNor = mesh2.normals!!
+            val oldIdx = mesh2.indices!!
+            val newPos = FloatArray(oldPos.size * 2)
+            val newNor = FloatArray(oldNor.size * 2)
+            val newIdx = IntArray(oldIdx.size * 2)
+            System.arraycopy(oldPos, 0, newPos, 0, oldPos.size)
+            System.arraycopy(oldPos, 0, newPos, oldPos.size, oldPos.size)
+            System.arraycopy(oldNor, 0, newNor, 0, oldNor.size)
+            System.arraycopy(oldNor, 0, newNor, oldNor.size, oldNor.size)
+            // adjust y of normals
+            for (i in 1 until newNor.size step 3) {
+                newNor[i] = -newNor[i]
+            }
+            System.arraycopy(oldIdx, 0, newIdx, 0, oldIdx.size)
+            newIdx.reverse()
+            System.arraycopy(oldIdx, 0, newIdx, 0, oldIdx.size)
+            mesh2.positions = newPos
+            mesh2.normals = newNor
+            mesh2.indices = newIdx
+        }
     }
 
     companion object {
-
-        private fun IntArray.flipIndices() {
-            var i = 0
-            val lastIndex = size - 2
-            while (i < lastIndex) {
-                val tmp = this[i]
-                this[i] = this[i + 1]
-                this[i + 1] = tmp
-                i += 3
-            }
-        }
 
         fun setGhostOutflow(width: Int, height: Int, v: FloatArray) {
 
@@ -314,7 +328,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             }
             TerrainUtils.generateRegularQuadHeightMesh(
                 cw - 2, ch - 2, cw + 1, cw,
-                false, cellSize, mesh.mesh2,
+                false, cellSize, mesh.getMesh(),
                 object : TerrainUtils.HeightMap {
                     override fun get(it: Int): Float {
                         val index = coarseIndexToFine(w, h, cw, ch, it)

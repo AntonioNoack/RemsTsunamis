@@ -8,6 +8,7 @@ import me.anno.tsunamis.engine.TsunamiEngine.Companion.setGhostOutflow
 import me.anno.tsunamis.setups.LinearDiscontinuitySetup
 import org.apache.logging.log4j.LogManager
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
@@ -46,12 +47,44 @@ object FWaveSolver {
             var hu1 = huSrc[i1]
 
             // apply dry-wet condition
-            // todo wetting & drying
-            if (!wet0) {// left cell is dry
+            // todo wetting
+            // todo drying
+            fun wetting(
+                h0: Float, h1: Float,
+                hu0: Float, hu1: Float,
+                s0: Float, s1: Float,
+                i0: Int, i1: Int
+            ) {
+                val availableWater = min(s1 - s0, h1)
+                val timeFactor = 0.1f
+                val deltaWater = availableWater * timeFactor
+                val deltaMomentum = deltaWater * hu1 / h1
+                hDst[i0] += deltaWater
+                hDst[i1] -= deltaWater
+                // huDst[i0] += deltaMomentum
+                // huDst[i1] -= deltaMomentum
+            }
+
+            if (!wet0) {// 0 is dry
+                /*val s0 = h0 + b0
+                val s1 = h1 + b1
+                val wetting = s1 > s0 + minFluidHeight
+                if (wetting) {
+                    // average height and momentum
+                    wetting(h0, h1, hu0, hu1, s0, s1, i0, i1)
+                    return
+                }*/
                 h0 = h1
                 b0 = b1
                 hu0 = -hu1
-            } else if (!wet1) {// right cell is dry
+            } else if (!wet1) {// 1 is dry
+                /*val s0 = h0 + b0
+                val s1 = h1 + b1
+                val wetting = s0 > s1 + minFluidHeight
+                if (wetting) {
+                    wetting(h1, h0, hu1, hu0, s1, s0, i1, i0)
+                    return
+                }*/
                 h1 = h0
                 b1 = b0
                 hu1 = -hu0

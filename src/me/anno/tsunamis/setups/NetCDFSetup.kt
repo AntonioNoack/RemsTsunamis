@@ -42,6 +42,16 @@ class NetCDFSetup : FluidSimSetup() {
     val dataHeight
         get() = getData(bathymetryFile, true)?.height ?: -1
 
+    override fun onCreate() {
+        super.onCreate()
+        val testClassName = "ucar/nc2/NetcdfFiles"
+        try {
+            this.javaClass.classLoader.loadClass(testClassName)
+        } catch (e: Exception) {
+            lastWarning = "$testClassName is missing!"
+        }
+    }
+
     override fun getPreferredNumCellsX(): Int {
         return getData(bathymetryFile, false)!!.width
     }

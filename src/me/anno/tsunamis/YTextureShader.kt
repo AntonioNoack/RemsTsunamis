@@ -10,8 +10,8 @@ import me.anno.gpu.shader.builder.VariableMode
 
 class YTextureShader private constructor(private val halfPrecision: Boolean) : ECSMeshShader("YTexture") {
 
-    override fun createVertexAttributes(instanced: Boolean, colors: Boolean): ArrayList<Variable> {
-        val list = super.createVertexAttributes(instanced, colors)
+    override fun createVertexVariables(isInstanced: Boolean, isAnimated: Boolean, colors: Boolean): ArrayList<Variable> {
+        val list = super.createVertexVariables(isInstanced, isAnimated, colors)
         list.removeIf {
             when (it.name) {
                 "coords",
@@ -94,10 +94,10 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                 "};\n"
     )
 
-    override fun createVertexStage(instanced: Boolean, colors: Boolean): ShaderStage {
+    override fun createVertexStage(isInstanced: Boolean, isAnimated: Boolean, colors: Boolean): ShaderStage {
 
         val defines = "" +
-                (if (instanced) "#define INSTANCED\n" else "") +
+                (if (isInstanced) "#define INSTANCED\n" else "") +
                 (if (colors) "#define COLORS\n" else "")
 
         glslVersion = 330
@@ -107,7 +107,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
 
         return ShaderStage(
             "vertex",
-            createVertexAttributes(instanced, colors),
+            createVertexVariables(isInstanced, isAnimated, colors),
             "" +
                     defines +
                     // create x,z coordinates from vertex index
@@ -121,8 +121,8 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "int instanceId = int(gl_InstanceID);\n" +
                     "int cellIndex  = instanceId >> 1;\n" +
                     "int partOfCell = gl_VertexID + (instanceId & 1) * 3;\n" +
-                    "int deltaX[6] = { 0, 1, 1, 1, 0, 0 };\n" +
-                    "int deltaY[6] = { 0, 1, 0, 1, 0, 1 };\n" +
+                    "int deltaX[6] = int[](0, 1, 1, 1, 0, 0);\n" +
+                    "int deltaY[6] = int[](0, 1, 0, 1, 0, 1);\n" +
                     "int numCellsX = max(1, coarseSize.x - 1);\n" +
                     "int numCellsY = max(1, coarseSize.y - 1);\n" +
                     "ivec2 numCells = ivec2(numCellsX, numCellsY);\n" +
@@ -179,11 +179,11 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
         }
     }
 
-    override fun createFragmentStage(instanced: Boolean): ShaderStage {
+    override fun createFragmentStage(isInstanced: Boolean, isAnimated: Boolean): ShaderStage {
 
         // copied from super mainly
 
-        val original = super.createFragmentStage(instanced)
+        val original = super.createFragmentStage(isInstanced, isAnimated)
 
         val fragmentVariables = original.variables + listOf(
             Variable(GLSLType.BOOL, "nearestNeighborColors", VariableMode.IN),

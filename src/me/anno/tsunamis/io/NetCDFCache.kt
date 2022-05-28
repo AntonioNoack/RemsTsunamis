@@ -17,7 +17,7 @@ object NetCDFCache : CacheSection("NetCDF") {
             return if (file is FileFileRef) {
                 NetcdfFiles.open(file.absolutePath)
             } else {
-                NetcdfFiles.openInMemory(System.nanoTime().toString(), file.readBytes())
+                NetcdfFiles.openInMemory(Engine.nanoTime.toString(), file.readBytes())
             }
         }*/
         val data = getFileEntry(file, false, 10_000, async) { file1, _ ->

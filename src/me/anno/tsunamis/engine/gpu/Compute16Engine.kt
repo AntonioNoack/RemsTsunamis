@@ -78,7 +78,7 @@ class Compute16Engine(
         maxVelocity = super.computeMaxVelocity(gravity, minFluidHeight)
         if (sim != null) super.updateStatistics(sim)
 
-        val buffer = fbPool[width * height * 4, false]
+        val buffer = fbPool[width * height * 4, false, false]
         val data = GLSLSolver.createTextureData(width, height, this, buffer)
         initTexture(rendered)
         rendered.createRGBA(data, false)

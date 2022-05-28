@@ -38,7 +38,7 @@ abstract class GPUEngine<Buffer>(
     }
 
     private fun uploadMainBuffer() {
-        val buffer = fbPool[width * height * 4, false]
+        val buffer = fbPool[width * height * 4, false, false]
         val data = createTextureData(width, height, this, buffer)
         createBuffer(src, data)
         fbPool.returnBuffer(buffer)

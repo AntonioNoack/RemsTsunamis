@@ -11,6 +11,7 @@ import me.anno.engine.raycast.Raycast
 import me.anno.engine.ui.render.RenderView
 import me.anno.gpu.GFX
 import me.anno.gpu.framebuffer.FBStack
+import me.anno.gpu.pipeline.CullMode
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.Texture2D
@@ -257,7 +258,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             NetCDFExport.export(this, false)
             isPaused = true
             // update the ui to reflect that the simulation was stopped
-            PropertyInspector.invalidateUI()
+            PropertyInspector.invalidateUI(true)
         } else LOGGER.warn("Cannot initialize field")
     }
 
@@ -449,7 +450,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     private var simulatedTime = 0.0
 
     private fun computeSimulationSpeed() {
-        val time = System.nanoTime()
+        val time = Engine.nanoTime
         val delta = time - lastStep
         lastStep = time
         val delta2 = simulatedTime - lastSimulatedTime
@@ -515,7 +516,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     }
 
     @SerializedProperty
-    var flipBathymetryNormal = false
+    var flipBathymetryNormal = CullMode.BOTH
         set(value) {
             if (field != value) {
                 field = value
@@ -579,13 +580,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         } else {
             material["cellSize"] = TypeValue(GLSLType.V1F, cellSizeMeters)
         }
-        // intended to solve z-fighting; doesn't work that well
-        // when culling is enabled, this won't be a problem anyways
-        val dz = if (flipBathymetryNormal) cellSize / 100f else 0f
-        val cellOffset = Vector3f(
-            -cw * 0.5f * cellSize, dz,
-            -ch * 0.5f * cellSize
-        )
+        val cellOffset = Vector3f(-cw * 0.5f * cellSize, 0f, -ch * 0.5f * cellSize)
         material["cellOffset"] = TypeValue(GLSLType.V3F, cellOffset)
         material["visualization"] = TypeValue(GLSLType.V1I, visualization.id)
         val visScale = 1f / max(1e-38f, maxVisualizedValueInternally)
@@ -624,7 +619,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
      * @param ch coarse height without ghost cells
      * */
     private fun ensureTriangleCount(mesh: ProceduralMesh, cw: Int, ch: Int) {
-        val mesh2 = mesh.mesh2
+        val mesh2 = mesh.getMesh()
         val targetSize = (cw - 1) * (ch - 1) * 2
         if (mesh2.proceduralLength != targetSize) {
             mesh2.proceduralLength = targetSize
@@ -678,7 +673,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             ensureTriangleCount(mesh, cw, ch)
         } else {
             mesh.materials = emptyList()
-            mesh.mesh2.proceduralLength = 0
+            mesh.getMesh().proceduralLength = 0
             engine.createFluidMesh(
                 w + 2, h + 2, cw + 2, ch + 2, cellSize, scale, fluidHeightScale,
                 visualization, colorMap, colorMapScale, maxVisualizedValueInternally, mesh
@@ -715,7 +710,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     fun step(dt: Float, numMaxIterations: Int = maxIterationsPerFrame): Float {
         var done = 0f
         var i = 0
-        val t0 = System.nanoTime()
+        val t0 = Engine.nanoTime
         val engine = engine!!
         while (done < dt && i++ < numMaxIterations) {
             val computeTimeStepInterval = computeTimeStepInterval
@@ -730,7 +725,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 simulatedTime += step
                 timeStepIndex++
             } else break
-            val t1 = System.nanoTime()
+            val t1 = Engine.nanoTime
             if ((t1 - t0) * computeBudgetFPS > 1e9f) break
             Thread.sleep(0) // for interrupts
         }
@@ -826,7 +821,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             ensureBuffer()
             GFX.check()
         } else {
-            GFX.addGPUTask(1) {
+            GFX.addGPUTask("invalidate",1) {
                 invalidateFluid()
             }
         }
@@ -835,7 +830,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     override fun onEditMove(x: Float, y: Float, dx: Float, dy: Float): Boolean {
         if (Input.isLeftDown) {
             // critical velocity: sqrt(g*h), so make it that we draw that within 10s
-            val time = System.nanoTime()
+            val time = Engine.nanoTime
             val minDt = 1f / 60f
             val deltaTime = (time - lastChange) * 1e-9f
             when {
@@ -849,7 +844,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                         }
                     }
                     // needs to be now (instead of when we started to process this update), so the system doesn't hang, when processing uses too much time
-                    lastChange = System.nanoTime()
+                    lastChange = Engine.nanoTime
                     lastMousePos.set(currentMousePos)
                 }
                 deltaTime > minDt -> {
@@ -932,7 +927,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     override fun onDestroy() {
         super.onDestroy()
-        mesh2.destroy()
+        getMesh().destroy()
         computingThread?.interrupt()
         computingThread = null
         engine?.destroy()

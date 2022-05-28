@@ -1,5 +1,6 @@
 package me.anno.tsunamis.io
 
+import me.anno.Engine
 import me.anno.cache.CacheSection
 import me.anno.io.files.FileReference
 import me.anno.io.files.InvalidRef
@@ -12,7 +13,7 @@ object NetCDFImageCache : CacheSection("NetCDF-Images") {
 
     fun getData(bytes: ByteArray, variableName: String?): VariableImage? {
         synchronized(NetCDFMutex) {
-            val data = NetcdfFiles.openInMemory(System.nanoTime().toString(), bytes)
+            val data = NetcdfFiles.openInMemory(Engine.nanoTime.toString(), bytes)
             val image = getData(data, variableName)
             data.close()
             return image

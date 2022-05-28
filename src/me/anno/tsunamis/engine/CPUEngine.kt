@@ -305,7 +305,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
     override fun requestFluidTexture(cw: Int, ch: Int): Texture2D {
         fluidTexture.setSize(cw, ch)
-        val buffer = fbPool[fluidTexture.w * fluidTexture.h * 4, false]
+        val buffer = fbPool[fluidTexture.w * fluidTexture.h * 4, false, false]
         val data = createTextureData(width + 2, height + 2, cw + 2, ch + 2, this, buffer)
         fluidTexture.autoUpdateMipmaps = false
         fluidTexture.createRGBA(data, false)
@@ -324,14 +324,14 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         @Suppress("unused")
         private val LOGGER = LogManager.getLogger(CPUEngine::class)
 
-        val fbPool = FloatArrayPool(8, true)
+        val fbPool = FloatArrayPool(8)
 
         fun getPixels(texture: Texture2D): Pair<FloatBuffer, ByteBuffer> {
 
             val width = texture.w
             val height = texture.h
 
-            val data = Texture2D.bufferPool[width * height * 4 * 4, false]
+            val data = Texture2D.bufferPool[width * height * 4 * 4, false, false]
                 .order(ByteOrder.nativeOrder())
             val floats = data.asFloatBuffer()
             floats.position(0)

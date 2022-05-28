@@ -202,12 +202,12 @@ fun main(args: Array<String>) {
 
         // guess the performance
         engine.synchronize()
-        val t0 = System.nanoTime()
+        val t0 = Engine.nanoTime
         for (i in 0 until warmupIterations) {
             engine.step(gravity, scaling, minFluidHeight)
         }
         engine.synchronize()
-        val t1 = System.nanoTime()
+        val t1 = Engine.nanoTime
 
         // compute the number of iterations, the solver will be capable of solving within about testDuration
         val numIterations =
@@ -215,27 +215,27 @@ fun main(args: Array<String>) {
         logger.info("$type, $numIterations iterations")
 
         // run performance measurements
-        val t2 = System.nanoTime()
+        val t2 = Engine.nanoTime
         for (i in 0 until numIterations) {
             engine.step(gravity, scaling, minFluidHeight)
         }
         engine.synchronize()
-        val t3 = System.nanoTime()
+        val t3 = Engine.nanoTime
 
         // compare step on x and y axis
         if (compareXY) {
             val numIterations2 = max(1, numIterations / 5)
-            val t4 = System.nanoTime()
+            val t4 = Engine.nanoTime
             for (i in 0 until numIterations2) {
                 engine.halfStep(gravity, scaling, minFluidHeight, true)
             }
             engine.synchronize()
-            val t5 = System.nanoTime()
+            val t5 = Engine.nanoTime
             for (i in 0 until numIterations2) {
                 engine.halfStep(gravity, scaling, minFluidHeight, false)
             }
             engine.synchronize()
-            val t6 = System.nanoTime()
+            val t6 = Engine.nanoTime
             val dtX = (t5 - t4) * 1e-9
             val dtY = (t6 - t5) * 1e-9
             logger.info("X half-step is ${(dtY / dtX).f2()}x faster than Y half-step")

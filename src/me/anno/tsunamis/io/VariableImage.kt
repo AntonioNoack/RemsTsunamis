@@ -62,9 +62,9 @@ class VariableImage(variable: Variable) : Image(
 
     private val colorMap = linColorMap.clone(min, max)
 
-    override fun getRGB(p0: Int): Int {
+    override fun getRGB(index: Int): Int {
         // if there is a special name like height or bathymetry, we could apply different color maps
-        return colorMap.getColor(data[p0])
+        return colorMap.getColor(data[index])
     }
 
     fun getValue(x: Int, y: Int): Float {
