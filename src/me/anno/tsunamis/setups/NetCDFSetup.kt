@@ -44,10 +44,12 @@ class NetCDFSetup : FluidSimSetup() {
 
     override fun onCreate() {
         super.onCreate()
-        val testClassName = "ucar/nc2/NetcdfFiles"
+        val testClassName = "ucar.nc2.NetcdfFiles"
         try {
             this.javaClass.classLoader.loadClass(testClassName)
-        } catch (e: Exception) {
+        } catch (e: ClassNotFoundException){
+            lastWarning = "$testClassName is missing!"
+        } catch (e: NoClassDefFoundError) {
             lastWarning = "$testClassName is missing!"
         }
     }

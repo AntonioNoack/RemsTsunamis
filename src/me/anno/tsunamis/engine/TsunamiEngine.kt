@@ -138,6 +138,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             // todo neither disabling nor enabling it works... this is cursed...
             // todo is something changing the order???
             mesh2.indices!!.reverse()
+            mesh2.invalidateGeometry()
         }
         if (culling == CullMode.BOTH) {
             // add inverse positions, normals and indices
@@ -161,6 +162,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             mesh2.positions = newPos
             mesh2.normals = newNor
             mesh2.indices = newIdx
+            mesh2.invalidateGeometry()
         }
     }
 
