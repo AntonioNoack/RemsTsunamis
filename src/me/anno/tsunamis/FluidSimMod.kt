@@ -22,8 +22,8 @@ class FluidSimMod : Mod() {
 
     // the bytes, that identify a NetCDF file; such file signatures can be registered to identify file types within Rem's Engine
     private val netCDFSignatures = listOf(
-        Signature("netcdf", 0, listOf(0x89, 'H'.code, 'D'.code, 'F'.code)),
-        Signature("netcdf", 0, listOf('C'.code, 'D'.code, 'F'.code))
+        Signature("netcdf", 0, 0x89, 'H'.code, 'D'.code, 'F'.code),
+        Signature("netcdf", 0, 'C'.code, 'D'.code, 'F'.code)
     )
 
     private val colorMapSignatures = listOf(

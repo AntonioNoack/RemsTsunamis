@@ -10,8 +10,13 @@ import me.anno.gpu.shader.builder.VariableMode
 
 class YTextureShader private constructor(private val halfPrecision: Boolean) : ECSMeshShader("YTexture") {
 
-    override fun createVertexVariables(isInstanced: Boolean, isAnimated: Boolean, colors: Boolean): ArrayList<Variable> {
-        val list = super.createVertexVariables(isInstanced, isAnimated, colors)
+    override fun createVertexVariables(
+        isInstanced: Boolean,
+        isAnimated: Boolean,
+        colors: Boolean,
+        motionVectors: Boolean
+    ): ArrayList<Variable> {
+        val list = super.createVertexVariables(isInstanced, isAnimated, colors, motionVectors)
         list.removeIf {
             when (it.name) {
                 "coords",
@@ -42,7 +47,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
         list.add(Variable(GLSLType.V4F, "heightMask"))
         list.add(Variable(GLSLType.V1F, "fluidHeightScale"))
         list.add(Variable(GLSLType.V2I, "coarseSize"))
-        list.add(Variable(GLSLType.BOOL, "nearestNeighborColors", VariableMode.IN))
+        list.add(Variable(GLSLType.V1B, "nearestNeighborColors", VariableMode.IN))
         return list
     }
 
@@ -94,7 +99,12 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                 "};\n"
     )
 
-    override fun createVertexStage(isInstanced: Boolean, isAnimated: Boolean, colors: Boolean): ShaderStage {
+    override fun createVertexStage(
+        isInstanced: Boolean,
+        isAnimated: Boolean,
+        colors: Boolean,
+        motionVectors: Boolean
+    ): ShaderStage {
 
         val defines = "" +
                 (if (isInstanced) "#define INSTANCED\n" else "") +
@@ -107,7 +117,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
 
         return ShaderStage(
             "vertex",
-            createVertexVariables(isInstanced, isAnimated, colors),
+            createVertexVariables(isInstanced, isAnimated, colors, motionVectors),
             "" +
                     defines +
                     // create x,z coordinates from vertex index
@@ -152,13 +162,13 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "       SURFACE2(dyp) - SURFACE2(dym)\n" +
                     "   ));\n" +
                     // should be done more properly, but it's only used for effects we don't need, so it doesn't really matter
-                    "   vec3 tangents = vec3(1.0, 0.0, 0.0);\n" +
+                    "   vec4 tangents = vec4(1.0, 0.0, 0.0, 0.0);\n" +
                     "#endif\n" +
                     // instanced is not supported
                     "finalPosition = localTransform * vec4(localPosition, 1.0);\n" +
                     "#ifdef COLORS\n" +
                     "   normal  = normalize(localTransform * vec4(normals, 0.0));\n" +
-                    "   tangent = normalize(localTransform * vec4(tangents, 0.0));\n" +
+                    "   tangent.xyz = normalize(localTransform * vec4(tangents.xyz, 0.0));\n" +
                     "   if(nearestNeighborColors){\n" +
                     "       if(coarseSize.x > 0 && coarseSize.x != fieldSize.x){\n" +
                     "           cellX0 = COARSE_INDEX_TO_FINE1(cellX0, fieldSize.x, coarseSize.x);\n" +
@@ -179,21 +189,21 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
         }
     }
 
-    override fun createFragmentStage(isInstanced: Boolean, isAnimated: Boolean): ShaderStage {
+    override fun createFragmentStage(isInstanced: Boolean, isAnimated: Boolean, motionVectors: Boolean): ShaderStage {
 
         // copied from super mainly
 
-        val original = super.createFragmentStage(isInstanced, isAnimated)
+        val original = super.createFragmentStage(isInstanced, isAnimated, motionVectors)
 
         val fragmentVariables = original.variables + listOf(
-            Variable(GLSLType.BOOL, "nearestNeighborColors", VariableMode.IN),
+            Variable(GLSLType.V1B, "nearestNeighborColors", VariableMode.IN),
             Variable(GLSLType.V4F, "fluidDataI", VariableMode.IN),
             Variable(GLSLType.S2D, "colorMap"),
             Variable(GLSLType.V2F, "colorMapScale"),
             Variable(GLSLType.V4F, "visualMask"),
             Variable(GLSLType.V1F, "visScale"),
             Variable(GLSLType.V1I, "visualization"),
-            Variable(GLSLType.BOOL, "halfTransparent")
+            Variable(GLSLType.V1B, "halfTransparent")
         )
 
         return ShaderStage(
@@ -208,7 +218,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "finalColor = color.rgb;\n" +
                     "finalAlpha = color.a;\n" +
                     // "   vec3 finalNormal = normal;\n" +
-                    "finalTangent   = normalize(tangent);\n" + // for debugging
+                    "finalTangent.xyz = normalize(tangent.xyz);\n" + // for debugging
                     "finalNormal    = normalize(normal);\n" +
                     "finalBitangent = normalize(cross(finalNormal, finalTangent));\n" +
                     // bitangent: checked, correct transform

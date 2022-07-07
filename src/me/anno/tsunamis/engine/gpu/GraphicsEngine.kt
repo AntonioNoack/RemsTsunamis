@@ -87,7 +87,7 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
             val p = if (x) "xyw" else "xzw"
             val shader = Shader(
                 if (x) "gfxTimeStep(x)" else "gfxTimeStep(y)",
-                null, "" +
+                "" +
                         "$attribute vec2 attr0;\n" +
                         "void main(){ gl_Position = vec4(attr0*2.0-1.0,0.5,1.0); }",
                 emptyList(), "" +

@@ -8,6 +8,7 @@ import me.anno.ecs.interfaces.CustomEditMode
 import me.anno.ecs.prefab.Prefab
 import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.engine.raycast.Raycast
+import me.anno.engine.ui.render.RenderState
 import me.anno.engine.ui.render.RenderView
 import me.anno.gpu.GFX
 import me.anno.gpu.framebuffer.FBStack
@@ -566,7 +567,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         ch: Int
     ) {
         if (colorMap != null) {
-            colorMap.createTexture(colorMapTexture, false)
+            colorMap.createTexture(colorMapTexture, true, false)
             colorMapTexture.clamping = Clamping.CLAMP
             material["colorMap"] = TypeValue(GLSLType.S2D, colorMapTexture)
             val newMax = colorMap.max * colorMapScale
@@ -585,7 +586,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         material["visualization"] = TypeValue(GLSLType.V1I, visualization.id)
         val visScale = 1f / max(1e-38f, maxVisualizedValueInternally)
         material["visScale"] = TypeValue(GLSLType.V1F, visScale)
-        material["halfTransparent"] = TypeValue(GLSLType.BOOL, fluidHalfTransparent)
+        material["halfTransparent"] = TypeValue(GLSLType.V1B, fluidHalfTransparent)
         material["visualMask"] = TypeValue(
             GLSLType.V4F,
             when (visualization) {
@@ -597,7 +598,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         material["heightMask"] = TypeValue(GLSLType.V4F, Vector4f(1f, 0f, 0f, 1f))
         material["fluidHeightScale"] = TypeValue(GLSLType.V1F, fluidHeightScale)
         material["coarseSize"] = TypeValue(GLSLType.V2I, Vector2i(cw, ch))
-        material["nearestNeighborColors"] = TypeValue(GLSLType.BOOL, nearestNeighborColors)
+        material["nearestNeighborColors"] = TypeValue(GLSLType.V1B, nearestNeighborColors)
     }
 
     // todo separate color map for bathymetry & fluid
@@ -768,8 +769,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     fun getMousePos(dst: Vector3f): Vector3f {
         val hit = Raycast.raycast(
             entity!!,
-            RenderView.camPosition,
-            RenderView.mouseDir,
+            RenderState.cameraPosition,
+            RenderView.currentInstance!!.mouseDirection,
             0.0, 0.0, 1e6,
             Raycast.TRIANGLES,
             -1,
