@@ -25,7 +25,7 @@ object NetCDFCache : CacheSection("NetCDF") {
                 val netcdfFile = if (file1 is FileFileRef) {
                     NetcdfFiles.open(file1.absolutePath)
                 } else {
-                    NetcdfFiles.openInMemory(file1.name, file1.readBytes())
+                    NetcdfFiles.openInMemory(file1.name, file1.readBytesSync())
                 }
                 object : CacheData<NetcdfFile>(netcdfFile) {
                     override fun destroy() {
@@ -37,9 +37,9 @@ object NetCDFCache : CacheSection("NetCDF") {
         return data?.value as? NetcdfFile
     }
 
-    fun readAsFolder(file: FileReference): InnerFolder {
+    fun readAsFolder(file: FileReference, callback: (InnerFolder?, Exception?) -> Unit) {
+        val folder = InnerFolder(file)
         synchronized(NetCDFMutex) {
-            val folder = InnerFolder(file)
             val data = loadFile(file, false) ?: throw IOException("Could not read $file as NetCDF file")
             for (variable in data.variables) {
                 var name = variable.fullName
@@ -53,8 +53,8 @@ object NetCDFCache : CacheSection("NetCDF") {
                 }
             }
             // we could convert most meta data into structures and images
-            return folder
         }
+        callback(folder, null)
     }
 
 }

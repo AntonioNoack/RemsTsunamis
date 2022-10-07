@@ -10,9 +10,9 @@ import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.engine.raycast.Raycast
 import me.anno.engine.ui.render.RenderState
 import me.anno.engine.ui.render.RenderView
+import me.anno.gpu.CullMode
 import me.anno.gpu.GFX
 import me.anno.gpu.framebuffer.FBStack
-import me.anno.gpu.pipeline.CullMode
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.Texture2D
@@ -774,6 +774,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             0.0, 0.0, 1e6,
             Raycast.TRIANGLES,
             -1,
+            emptySet(),
             true
         )
         if (hit != null) {
@@ -822,7 +823,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             ensureBuffer()
             GFX.check()
         } else {
-            GFX.addGPUTask("invalidate",1) {
+            GFX.addGPUTask("invalidate", 1) {
                 invalidateFluid()
             }
         }

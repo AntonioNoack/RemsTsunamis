@@ -5,7 +5,7 @@ import me.anno.image.Image
 import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference
 import me.anno.io.files.FileReference.Companion.getReference
-import me.anno.io.xml.XMLElement
+import me.anno.io.xml.XMLNode
 import me.anno.io.xml.XMLReader
 import me.anno.ui.editor.color.ColorSpace
 import me.anno.ui.editor.color.spaces.HSV
@@ -14,7 +14,6 @@ import me.anno.utils.Color.b
 import me.anno.utils.Color.g
 import me.anno.utils.Color.r
 import me.anno.utils.Color.rgba
-import me.anno.utils.files.Files.use
 import me.anno.maths.Maths.max
 import me.anno.maths.Maths.min
 import me.anno.maths.Maths.mix
@@ -121,7 +120,7 @@ class ColorMap(
         }
 
         private fun process(
-            node: XMLElement,
+            node: XMLNode,
             colors: IntArrayList,
             heights: FloatArrayList,
             space: ColorSpace
@@ -148,7 +147,7 @@ class ColorMap(
                 } else {
                     // might be a wrapper node
                     for (child in node.children) {
-                        if (child is XMLElement) {
+                        if (child is XMLNode) {
                             space0 = process(child, colors, heights, space0)
                         }
                     }
@@ -163,7 +162,7 @@ class ColorMap(
 
         fun read(input: InputStream): ColorMap? {
             val xmlData = XMLReader.parse(input)
-            return if (xmlData is XMLElement) {
+            return if (xmlData is XMLNode) {
                 val colors = IntArrayList(16)
                 val heights = FloatArrayList(16)
                 val space = process(xmlData, colors, heights, RGBColorSpace)
@@ -176,7 +175,7 @@ class ColorMap(
 
         fun read(file: FileReference, async: Boolean): ColorMap? {
             return cache.getFileEntry(file, false, 10_000, async) { file1, _ ->
-                use(file1.inputStream()) { read(it) }
+                file1.inputStreamSync().use { read(it) }
             } as? ColorMap
         }
 

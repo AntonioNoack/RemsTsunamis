@@ -1,21 +1,22 @@
 package me.anno.tsunamis
 
-import me.anno.config.DefaultStyle
 import me.anno.engine.RemsEngine
 import me.anno.extensions.ExtensionLoader
 import me.anno.extensions.mods.Mod
 import me.anno.image.Image
 import me.anno.image.ImageCPUCache
+import me.anno.image.ImageCallback
 import me.anno.image.colormap.LinearColorMap
 import me.anno.io.ISaveable.Companion.registerCustomClass
 import me.anno.io.files.FileReference
 import me.anno.io.files.Signature
 import me.anno.io.utils.StringMap
-import me.anno.io.zip.ZipCache
+import me.anno.io.zip.InnerFolderCache
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFCache
 import me.anno.tsunamis.io.NetCDFImageCache
 import me.anno.tsunamis.setups.*
+import me.anno.utils.Color.black
 import java.io.InputStream
 
 class FluidSimMod : Mod() {
@@ -30,8 +31,8 @@ class FluidSimMod : Mod() {
         Signature("colormap", 0, "<ColorMap")
     )
 
-    private fun readNetCDF(file: FileReference): Image? {
-        return NetCDFImageCache.getData(file, false)
+    private fun readNetCDF(file: FileReference, callback: ImageCallback) {
+        callback(NetCDFImageCache.getData(file, false), null)
     }
 
     private fun readNetCDF(bytes: ByteArray): Image? {
@@ -48,8 +49,8 @@ class FluidSimMod : Mod() {
         return bytes.inputStream().use { ColorMap.read(it) }
     }
 
-    private fun readColorMap(file: FileReference): Image? {
-        return file.inputStream().use { ColorMap.read(it) }
+    private fun readColorMap(file: FileReference, callback: ImageCallback) {
+        callback(file.inputStreamSync().use { ColorMap.read(it) }, null)
     }
 
     private fun readColorMap(inputStream: InputStream): Image? {
@@ -64,7 +65,7 @@ class FluidSimMod : Mod() {
             Signature.register(s)
         ImageCPUCache.registerReader("netcdf", ::readNetCDF, ::readNetCDF, ::readNetCDF)
         ImageCPUCache.registerReader("nc", ::readNetCDF, ::readNetCDF, ::readNetCDF)
-        ZipCache.register("netcdf", NetCDFCache::readAsFolder)
+        InnerFolderCache.register("netcdf", NetCDFCache::readAsFolder)
 
         // register color map preview
         for (s in colorMapSignatures)
@@ -93,7 +94,7 @@ class FluidSimMod : Mod() {
 
     companion object {
 
-        val linColorMap = LinearColorMap(0x0055ff or DefaultStyle.black, -1, 0xff0000 or DefaultStyle.black)
+        val linColorMap = LinearColorMap(0x0055ff or black, -1, 0xff0000 or black)
             .clone(-1f, 1f)
 
         @JvmStatic

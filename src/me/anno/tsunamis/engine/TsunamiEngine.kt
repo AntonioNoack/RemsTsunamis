@@ -2,7 +2,7 @@ package me.anno.tsunamis.engine
 
 import me.anno.ecs.components.mesh.ProceduralMesh
 import me.anno.ecs.components.mesh.terrain.TerrainUtils
-import me.anno.gpu.pipeline.CullMode
+import me.anno.gpu.CullMode
 import me.anno.gpu.texture.Texture2D
 import me.anno.maths.Maths
 import me.anno.tsunamis.FluidSim
@@ -12,7 +12,6 @@ import me.anno.tsunamis.FluidSimMod.Companion.linColorMap
 import me.anno.tsunamis.Visualisation
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.setups.FluidSimSetup
-import org.joml.Vector3f
 import kotlin.math.max
 import kotlin.math.min
 
@@ -109,30 +108,23 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             cw - 2, ch - 2, 1 + cw, cw,
             culling == CullMode.BACK, // todo why is this not flipping the order?
             cellSize, mesh2,
-            object : TerrainUtils.HeightMap {
-                override fun get(it: Int): Float {
-                    val i = coarseIndexToFine(w, h, cw, ch, it)
-                    return bathymetry[i]
-                }
+            { index ->
+                val i = coarseIndexToFine(w, h, cw, ch, index)
+                bathymetry[i]
             },
-            object : TerrainUtils.NormalMap {
-                override fun get(x: Int, y: Int, i: Int, dst: Vector3f) {
-                    val cx = min(x * w / cw, w - 1)
-                    val cy = min(y * h / ch, h - 1)
-                    dst.x = getBathymetryAt(cx + scale, cy) - getBathymetryAt(cx - scale, cy)
-                    dst.y = normalY
-                    dst.z = getBathymetryAt(cx, cy + scale) - getBathymetryAt(cx, cy - scale)
-                    dst.normalize()
-                }
+            { x, y, _, dst ->
+                val cx = min(x * w / cw, w - 1)
+                val cy = min(y * h / ch, h - 1)
+                dst.x = getBathymetryAt(cx + scale, cy) - getBathymetryAt(cx - scale, cy)
+                dst.y = normalY
+                dst.z = getBathymetryAt(cx, cy + scale) - getBathymetryAt(cx, cy - scale)
+                dst.normalize()
             },
-            if (colorMap == null) object : TerrainUtils.ColorMap {
-                override fun get(it: Int): Int = -1
-            } else object : TerrainUtils.ColorMap {
-                override fun get(it: Int): Int {
-                    val i = coarseIndexToFine(w, h, cw, ch, it)
-                    return colorMap.getColor(bathymetry[i] * invCMScale)
+            if (colorMap == null) TerrainUtils.ColorMap { -1 } else
+                TerrainUtils.ColorMap { index ->
+                    val i = coarseIndexToFine(w, h, cw, ch, index)
+                    colorMap.getColor(bathymetry[i] * invCMScale)
                 }
-            }
         )
         if (culling == CullMode.BACK) {
             // todo neither disabling nor enabling it works... this is cursed...
@@ -239,85 +231,66 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             val invCMScale = 1f / colorMapScale
             val getColor: TerrainUtils.ColorMap = when (visualisation) {
                 Visualisation.HEIGHT_MAP -> {
-                    if (colorMap == null) object : TerrainUtils.ColorMap {
-                        override fun get(it: Int) = getWaterColor(fluidHeight[it])
-                    } else object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
+                    if (colorMap == null) TerrainUtils.ColorMap { getWaterColor(fluidHeight[it]) } else
+                        TerrainUtils.ColorMap {
                             val i = coarseIndexToFine(w, h, cw, ch, it)
                             val fh = fluidHeight[i]
-                            return if (fh > 0f) {// under water, surface color
+                            if (fh > 0f) {// underwater, surface color
                                 colorMap.getColor(-fh * invCMScale)
                             } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
                         }
-                    }
                 }
                 Visualisation.MOMENTUM_X -> {
                     val momentumScale = 1f / max(maxVisualizedValueInternally, 1e-38f)
-                    if (colorMap == null) object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
-                            val i = coarseIndexToFine(w, h, cw, ch, it)
-                            return getColor11(fluidMomentumX[i] * momentumScale)
-                        }
-                    } else object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
-                            val i = coarseIndexToFine(w, h, cw, ch, it)
-                            val fh = fluidHeight[i]
-                            return if (fh > 0f) {// under water, surface color
-                                getColor11(fluidMomentumX[i] * momentumScale)
-                            } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
-                        }
+                    if (colorMap == null) TerrainUtils.ColorMap {
+                        val i = coarseIndexToFine(w, h, cw, ch, it)
+                        getColor11(fluidMomentumX[i] * momentumScale)
+                    } else TerrainUtils.ColorMap {
+                        val i = coarseIndexToFine(w, h, cw, ch, it)
+                        val fh = fluidHeight[i]
+                        if (fh > 0f) {// underwater, surface color
+                            getColor11(fluidMomentumX[i] * momentumScale)
+                        } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
                     }
                 }
                 Visualisation.MOMENTUM_Y -> {
                     val momentumScale = 1f / max(maxVisualizedValueInternally, 1e-38f)
-                    if (colorMap == null) object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
-                            val i = coarseIndexToFine(w, h, cw, ch, it)
-                            return getColor11(fluidMomentumY[i] * momentumScale)
-                        }
-                    } else object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
-                            val i = coarseIndexToFine(w, h, cw, ch, it)
-                            val fh = fluidHeight[i]
-                            return if (fh > 0f) {// under water, surface color
-                                getColor11(fluidMomentumY[i] * momentumScale)
-                            } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
-                        }
+                    if (colorMap == null) TerrainUtils.ColorMap {
+                        val i = coarseIndexToFine(w, h, cw, ch, it)
+                        getColor11(fluidMomentumY[i] * momentumScale)
+                    } else TerrainUtils.ColorMap {
+                        val i = coarseIndexToFine(w, h, cw, ch, it)
+                        val fh = fluidHeight[i]
+                        if (fh > 0f) {// underwater, surface color
+                            getColor11(fluidMomentumY[i] * momentumScale)
+                        } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
                     }
                 }
                 Visualisation.MOMENTUM -> {
                     val momentumScale = 1f / max(maxVisualizedValueInternally, 1e-38f)
-                    if (colorMap == null) object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
-                            val i = coarseIndexToFine(w, h, cw, ch, it)
-                            return getColor11(Maths.length(fluidMomentumX[i], fluidMomentumY[i]) * momentumScale)
-                        }
-                    } else object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
-                            val i = coarseIndexToFine(w, h, cw, ch, it)
-                            val fh = fluidHeight[i]
-                            return if (fh > 0f) {// under water, surface color
-                                getColor11(Maths.length(fluidMomentumX[i], fluidMomentumY[i]) * momentumScale)
-                            } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
-                        }
+                    if (colorMap == null) TerrainUtils.ColorMap {
+                        val i = coarseIndexToFine(w, h, cw, ch, it)
+                        getColor11(Maths.length(fluidMomentumX[i], fluidMomentumY[i]) * momentumScale)
+                    } else TerrainUtils.ColorMap {
+                        val i = coarseIndexToFine(w, h, cw, ch, it)
+                        val fh = fluidHeight[i]
+                        if (fh > 0f) {// underwater, surface color
+                            getColor11(Maths.length(fluidMomentumX[i], fluidMomentumY[i]) * momentumScale)
+                        } else colorMap.getColor(bathymetry[i] * invCMScale) // land color
                     }
                 }
                 Visualisation.WATER_SURFACE -> {
                     val heightScale = 1f / max(maxVisualizedValueInternally, 1e-38f)
-                    if (colorMap == null) object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
-                            val i = coarseIndexToFine(w, h, cw, ch, it)
-                            return getColor11((fluidHeight[i] + bathymetry[i]) * heightScale)
-                        }
-                    } else object : TerrainUtils.ColorMap {
-                        override fun get(it: Int): Int {
-                            val i = coarseIndexToFine(w, h, cw, ch, it)
-                            val fh = fluidHeight[i]
-                            val ba = bathymetry[i]
-                            return if (fh > 0f) {// under water, surface color
-                                getColor11((fh + ba) * heightScale)
-                            } else colorMap.getColor(ba * invCMScale) // land color
-                        }
+                    if (colorMap == null) TerrainUtils.ColorMap {
+                        val i = coarseIndexToFine(w, h, cw, ch, it)
+                        getColor11((fluidHeight[i] + bathymetry[i]) * heightScale)
+                    } else TerrainUtils.ColorMap {
+                        val i = coarseIndexToFine(w, h, cw, ch, it)
+                        val fh = fluidHeight[i]
+                        val ba = bathymetry[i]
+                        if (fh > 0f) {// under water, surface color
+                            getColor11((fh + ba) * heightScale)
+                        } else colorMap.getColor(ba * invCMScale) // land color
                     }
                 }
             }
@@ -331,23 +304,19 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             TerrainUtils.generateRegularQuadHeightMesh(
                 cw - 2, ch - 2, cw + 1, cw,
                 false, cellSize, mesh.getMesh(),
-                object : TerrainUtils.HeightMap {
-                    override fun get(it: Int): Float {
-                        val index = coarseIndexToFine(w, h, cw, ch, it)
-                        val fh = fluidHeight[index]
-                        val surface = fh + bathymetry[index]
-                        return if (fh > 0f) surface * fluidHeightScale else surface
-                    }
+                {
+                    val index = coarseIndexToFine(w, h, cw, ch, it)
+                    val fh = fluidHeight[index]
+                    val surface = fh + bathymetry[index]
+                    if (fh > 0f) surface * fluidHeightScale else surface
                 },
-                object : TerrainUtils.NormalMap {
-                    override fun get(x: Int, y: Int, i: Int, dst: Vector3f) {
-                        val cx = min(x * w / cw, w - 1)
-                        val cy = min(y * h / ch, h - 1)
-                        dst.x = getSurfaceHeightAt(cx + scale, cy) - getSurfaceHeightAt(cx - scale, cy)
-                        dst.y = cellSize * scale * 2f
-                        dst.z = getSurfaceHeightAt(cx, cy + scale) - getSurfaceHeightAt(cx, cy - scale)
-                        dst.normalize()
-                    }
+                { x, y, _, dst ->
+                    val cx = min(x * w / cw, w - 1)
+                    val cy = min(y * h / ch, h - 1)
+                    dst.x = getSurfaceHeightAt(cx + scale, cy) - getSurfaceHeightAt(cx - scale, cy)
+                    dst.y = cellSize * scale * 2f
+                    dst.z = getSurfaceHeightAt(cx, cy + scale) - getSurfaceHeightAt(cx, cy - scale)
+                    dst.normalize()
                 },
                 getColor
             )

@@ -1,6 +1,5 @@
 package me.anno.tsunamis
 
-import me.anno.config.DefaultStyle.black
 import me.anno.gpu.drawing.DrawRectangles.drawRect
 import me.anno.gpu.drawing.DrawTexts.drawSimpleTextCharByChar
 import me.anno.gpu.drawing.DrawTexts.monospaceFont
@@ -11,6 +10,7 @@ import me.anno.tsunamis.io.ColorMap
 import me.anno.ui.Panel
 import me.anno.ui.base.constraints.AxisAlignment
 import me.anno.ui.style.Style
+import me.anno.utils.Color.black
 import kotlin.math.max
 import kotlin.math.min
 

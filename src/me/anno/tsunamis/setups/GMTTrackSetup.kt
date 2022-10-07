@@ -9,7 +9,6 @@ import me.anno.image.ImageWriter
 import me.anno.image.colormap.LinearColorMap
 import me.anno.io.csv.CSVReader
 import me.anno.io.files.FileReference
-import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.files.InvalidRef
 import me.anno.io.serialization.SerializedProperty
 import me.anno.maths.Maths.mix
@@ -217,7 +216,7 @@ class GMTTrackSetup : FluidSimSetup() {
 
         fun getData(file: FileReference, async: Boolean): Pair<Float, FloatArray>? {
             val data = trackCache.getFileEntry(file, false, 1000, async) { file1, _ ->
-                val data = CSVReader.readNumerical(file1.readText(), ',', '\n', 0.0)
+                val data = CSVReader.readNumerical(file1.readTextSync(), ',', '\n', 0.0)
                 val positions = data["track_location"]
                 val bathymetry = data["height"] ?: throw IOException("Didn't find column 'height'")
                 val size = bathymetry.size

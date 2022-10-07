@@ -1,7 +1,7 @@
 package me.anno.tsunamis.engine.gpu
 
 import me.anno.gpu.GFX
-import me.anno.gpu.OpenGL.renderPurely
+import me.anno.gpu.GFXState.renderPurely
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
 import me.anno.gpu.texture.Texture2D

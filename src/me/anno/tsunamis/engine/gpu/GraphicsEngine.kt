@@ -1,8 +1,8 @@
 package me.anno.tsunamis.engine.gpu
 
 import me.anno.gpu.GFX
-import me.anno.gpu.OpenGL.renderPurely
-import me.anno.gpu.OpenGL.useFrame
+import me.anno.gpu.GFXState.renderPurely
+import me.anno.gpu.GFXState.useFrame
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
 import me.anno.gpu.shader.OpenGLShader.Companion.attribute

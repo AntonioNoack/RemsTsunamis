@@ -14,9 +14,10 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
         isInstanced: Boolean,
         isAnimated: Boolean,
         colors: Boolean,
-        motionVectors: Boolean
+        motionVectors: Boolean,
+        limitedTransform: Boolean
     ): ArrayList<Variable> {
-        val list = super.createVertexVariables(isInstanced, isAnimated, colors, motionVectors)
+        val list = super.createVertexVariables(isInstanced, isAnimated, colors, motionVectors, limitedTransform)
         list.removeIf {
             when (it.name) {
                 "coords",
@@ -103,7 +104,8 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
         isInstanced: Boolean,
         isAnimated: Boolean,
         colors: Boolean,
-        motionVectors: Boolean
+        motionVectors: Boolean,
+        limitedTransform: Boolean
     ): ShaderStage {
 
         val defines = "" +
@@ -117,7 +119,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
 
         return ShaderStage(
             "vertex",
-            createVertexVariables(isInstanced, isAnimated, colors, motionVectors),
+            createVertexVariables(isInstanced, isAnimated, colors, motionVectors, limitedTransform),
             "" +
                     defines +
                     // create x,z coordinates from vertex index

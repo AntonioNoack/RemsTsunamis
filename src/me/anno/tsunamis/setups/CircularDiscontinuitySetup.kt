@@ -6,7 +6,7 @@ import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.length
 import me.anno.maths.Maths.mix
 import me.anno.tsunamis.FluidSim
-import org.joml.Vector2f.lengthSquared
+import org.joml.Vector2f.Companion.lengthSquared
 import kotlin.math.max
 
 class CircularDiscontinuitySetup : FluidSimSetup {

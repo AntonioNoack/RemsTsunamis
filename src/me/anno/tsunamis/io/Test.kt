@@ -9,7 +9,7 @@ fun main() {
     val c = Clock()
     val src = FileReference.getReference("E:\\Documents\\Uni\\Master\\WS2122/tohoku_gebco08_ucsb3_250m_bath.nc")
     c.stop("getReference")
-    val inMemory = src.readBytes()
+    val inMemory = src.readBytesSync()
     c.stop("inMemory")
     // NetCDFCache.loadFile(src, false)?.close()
     c.stop("Test")

@@ -2,7 +2,7 @@ package me.anno.tsunamis
 
 import me.anno.Engine
 import me.anno.gpu.GFX
-import me.anno.gpu.OpenGL.useFrame
+import me.anno.gpu.GFXState.useFrame
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
 import me.anno.gpu.hidden.HiddenOpenGLContext
@@ -109,7 +109,7 @@ object VideoRenderer {
 
         val maxValues = Vector4f()
         val srcFB = Framebuffer("src", outputWidth, outputHeight, 1, 1, true, DepthBufferType.NONE)
-        renderVideo(outputWidth, outputHeight, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB) { callback ->
+        renderVideo(outputWidth, outputHeight, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB) { _, callback ->
             for (i in 0 until numStepsPerFrame) {
                 engine.step(gravity, scaling, minFluidHeight)
             }

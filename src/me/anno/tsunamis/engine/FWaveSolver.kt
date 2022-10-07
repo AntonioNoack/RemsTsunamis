@@ -415,7 +415,7 @@ object FWaveSolver {
         setup.hasBorder = false
 
         val lines = getReference("E:/Documents/Uni/Master/WS2122/tsunami/data/middle_states.csv")
-            .inputStream().bufferedReader()
+            .inputStreamSync().bufferedReader()
 
         var numPassed = 0
         var numTests = 0
