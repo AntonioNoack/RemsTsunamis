@@ -4,7 +4,8 @@ import me.anno.cache.CacheData
 import me.anno.cache.CacheSection
 import me.anno.io.files.FileFileRef
 import me.anno.io.files.FileReference
-import me.anno.io.zip.InnerFolder
+import me.anno.io.files.inner.InnerFolder
+import me.anno.utils.structures.Callback
 import ucar.nc2.NetcdfFile
 import ucar.nc2.NetcdfFiles
 import java.io.IOException
@@ -17,7 +18,7 @@ object NetCDFCache : CacheSection("NetCDF") {
             return if (file is FileFileRef) {
                 NetcdfFiles.open(file.absolutePath)
             } else {
-                NetcdfFiles.openInMemory(Engine.nanoTime.toString(), file.readBytes())
+                NetcdfFiles.openInMemory(Time.nanoTime.toString(), file.readBytes())
             }
         }*/
         val data = getFileEntry(file, false, 10_000, async) { file1, _ ->
@@ -37,7 +38,7 @@ object NetCDFCache : CacheSection("NetCDF") {
         return data?.value as? NetcdfFile
     }
 
-    fun readAsFolder(file: FileReference, callback: (InnerFolder?, Exception?) -> Unit) {
+    fun readAsFolder(file: FileReference, callback: Callback<InnerFolder>) {
         val folder = InnerFolder(file)
         synchronized(NetCDFMutex) {
             val data = loadFile(file, false) ?: throw IOException("Could not read $file as NetCDF file")
@@ -52,9 +53,9 @@ object NetCDFCache : CacheSection("NetCDF") {
                     folder.createImageChild(name, VariableImage(variable))
                 }
             }
-            // we could convert most meta data into structures and images
+            // we could convert most metadata into structures and images
         }
-        callback(folder, null)
+        callback.ok(folder)
     }
 
 }

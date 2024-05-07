@@ -4,7 +4,7 @@ import me.anno.gpu.GFX
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
 import me.anno.gpu.texture.Texture2D
-import org.joml.Vector2i
+import org.joml.Vector3i
 
 class ComputeYXEngine(width: Int, height: Int) :
     ComputeEngine(width, height) {
@@ -30,7 +30,7 @@ class ComputeYXEngine(width: Int, height: Int) :
             val p = if (x) "xyw" else "xzw"
             return ComputeShader(
                 if (x) "computeTimeStep(x)" else "computeTimeStep(y)",
-                Vector2i(16), "" +
+                Vector3i(16, 16, 1), emptyList(), "" +
                         "precision highp float;\n" +
                         "layout(rgba32f, binding = 0) uniform image2D src;\n" +
                         "layout(rgba32f, binding = 1) uniform image2D dst;\n" +
@@ -63,9 +63,9 @@ class ComputeYXEngine(width: Int, height: Int) :
         ) {
             shader.use()
             initShader(shader, timeScale, gravity, minFluidHeight, src)
-            ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
-            ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
-            shader.runBySize(src.h, src.w)
+            shader.bindTexture(0, src, ComputeTextureMode.READ)
+            shader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            shader.runBySize(src.height, src.width)
         }
 
     }

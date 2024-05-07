@@ -1,14 +1,15 @@
 package me.anno.tsunamis
 
 import me.anno.Engine
-import me.anno.gpu.GFX
 import me.anno.gpu.GFXState.useFrame
+import me.anno.gpu.buffer.SimpleBuffer
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
-import me.anno.gpu.hidden.HiddenOpenGLContext
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.ShaderLib
+import me.anno.gpu.shader.ShaderLib.uvList
 import me.anno.gpu.shader.builder.Variable
+import me.anno.jvm.HiddenOpenGLContext
 import me.anno.tsunamis.egl.EGLContext
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.EngineType
@@ -17,7 +18,6 @@ import me.anno.tsunamis.perf.SetupLoader
 import me.anno.tsunamis.perf.SetupLoader.getOrDefault
 import me.anno.utils.OS.desktop
 import me.anno.utils.Sleep.waitUntil
-import me.anno.utils.types.Vectors.print
 import me.anno.video.VideoCreator.Companion.renderVideo
 import org.apache.logging.log4j.LogManager
 import org.joml.Vector4f
@@ -31,9 +31,10 @@ object VideoRenderer {
     private val LOGGER = LogManager.getLogger(VideoRenderer::class)
 
     private val showWavesShader = ShaderLib.createShader(
-        "copy", ShaderLib.simplestVertexShader, listOf(Variable(GLSLType.V2F, "uv")), "" +
-                "uniform sampler2D tex;\n" +
-                "uniform vec3 scale;\n" +
+        "copy", listOf(), ShaderLib.coordsUVVertexShader, uvList, listOf(
+            Variable(GLSLType.S2D, "tex"),
+            Variable(GLSLType.V3F, "scale")
+        ), "" +
                 "void main(){\n" +
                 "   vec4 data = texture(tex, uv);\n" +
                 "   float surface = scale.x * (data.x + data.w);\n" +
@@ -109,7 +110,7 @@ object VideoRenderer {
 
         val maxValues = Vector4f()
         val srcFB = Framebuffer("src", outputWidth, outputHeight, 1, 1, true, DepthBufferType.NONE)
-        renderVideo(outputWidth, outputHeight, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB) { _, callback ->
+        renderVideo(outputWidth, outputHeight, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB, { _, callback ->
             for (i in 0 until numStepsPerFrame) {
                 engine.step(gravity, scaling, minFluidHeight)
             }
@@ -119,12 +120,12 @@ object VideoRenderer {
                 shader.use()
                 shader.v3f("scale", 1f / maxFluidHeight, 1f / maxMomentum, 1f / maxMomentum)
                 engine.requestFluidTexture(w, h).bind(0)
-                GFX.flat01.draw(shader)
+                SimpleBuffer.flat01.draw(shader)
             }
             callback()
-        }
+        })
 
-        LOGGER.info("Maximum values: ${maxValues.print()}")
+        LOGGER.info("Maximum values: $maxValues")
 
         Engine.requestShutdown()
 

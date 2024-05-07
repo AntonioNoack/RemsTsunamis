@@ -2,6 +2,7 @@ package me.anno.tsunamis.draw
 
 import me.anno.gpu.shader.ComputeShader
 import org.joml.Vector2i
+import org.joml.Vector3i
 
 class DrawShaders(comp16engine: Boolean, halfPrecisionBath: Boolean) {
 
@@ -10,7 +11,7 @@ class DrawShaders(comp16engine: Boolean, halfPrecisionBath: Boolean) {
 
     val drawShader by lazy {
         ComputeShader(
-            "drawing", Vector2i(16), "" +
+            "drawing", Vector3i(16, 16, 1), listOf(), "" +
                     "layout($format, binding = 0) uniform image2D src;\n" +
                     "layout($format, binding = 1) uniform image2D dst;\n" +
                     (if (comp16engine)
@@ -57,7 +58,7 @@ class DrawShaders(comp16engine: Boolean, halfPrecisionBath: Boolean) {
 
     val copyShader by lazy {
         ComputeShader(
-            "drawing-copy", Vector2i(16), "" +
+            "drawing-copy", Vector3i(16, 16, 1), emptyList(), "" +
                     "layout($format, binding = 0) uniform image2D src;\n" +
                     "layout($format, binding = 1) uniform image2D dst;\n" +
                     "uniform ivec2 inSize;\n" +

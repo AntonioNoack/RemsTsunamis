@@ -7,27 +7,12 @@ import me.anno.gpu.shader.builder.Function
 import me.anno.gpu.shader.builder.ShaderStage
 import me.anno.gpu.shader.builder.Variable
 import me.anno.gpu.shader.builder.VariableMode
+import me.anno.utils.types.Booleans.hasFlag
 
 class YTextureShader private constructor(private val halfPrecision: Boolean) : ECSMeshShader("YTexture") {
 
-    override fun createVertexVariables(
-        isInstanced: Boolean,
-        isAnimated: Boolean,
-        colors: Boolean,
-        motionVectors: Boolean,
-        limitedTransform: Boolean
-    ): ArrayList<Variable> {
-        val list = super.createVertexVariables(isInstanced, isAnimated, colors, motionVectors, limitedTransform)
-        list.removeIf {
-            when (it.name) {
-                "coords",
-                "normals",
-                "tangents",
-                "uvs",
-                "vertexColors" -> true
-                else -> false
-            }
-        }
+    fun createVertexVariables(): ArrayList<Variable> {
+        val list = ArrayList<Variable>()
         list.add(Variable(GLSLType.M4x3, "localTransform"))
         if (halfPrecision) {
             list.add(Variable(GLSLType.S2D, "fluidSurface"))
@@ -51,6 +36,8 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
         list.add(Variable(GLSLType.V1B, "nearestNeighborColors", VariableMode.IN))
         return list
     }
+
+    // todo this is broken!!! terrain or fluid surface are drawn 100s of times over each other, which is wrong, and ruins performance
 
     private val getColorFunc = Function(
         "", "color-func",
@@ -100,13 +87,10 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                 "};\n"
     )
 
-    override fun createVertexStage(
-        isInstanced: Boolean,
-        isAnimated: Boolean,
-        colors: Boolean,
-        motionVectors: Boolean,
-        limitedTransform: Boolean
-    ): ShaderStage {
+    override fun createVertexStages(key: ShaderKey): List<ShaderStage> {
+
+        val isInstanced = key.flags.hasFlag(IS_INSTANCED)
+        val colors = key.flags.hasFlag(NEEDS_COLORS)
 
         val defines = "" +
                 (if (isInstanced) "#define INSTANCED\n" else "") +
@@ -114,12 +98,13 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
 
         glslVersion = 330
 
+       // val original = super.createVertexStages(key)
+
         // done coarsening on gpu side: scale down image, or just use it as-is with strided access?
         // (to do maybe) scaling down the image should help performance, when not every frame is rendered, or shadows are needed
 
-        return ShaderStage(
-            "vertex",
-            createVertexVariables(isInstanced, isAnimated, colors, motionVectors, limitedTransform),
+        return emptyList<ShaderStage>() + ShaderStage(
+            "vertex", createVertexVariables(),
             "" +
                     defines +
                     // create x,z coordinates from vertex index
@@ -183,21 +168,20 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "   }\n" +
                     "   uv = vec2(0.0);\n" +
                     "#endif\n" +
-                    "gl_Position = transform * vec4(finalPosition, 1.0);\n" +
-                    ShaderLib.positionPostProcessing
+                    "gl_Position = transform * vec4(finalPosition, 1.0);\n"
         ).apply {
             functions.add(getColorFunc)
             functions.add(getPixelFunc)
         }
     }
 
-    override fun createFragmentStage(isInstanced: Boolean, isAnimated: Boolean, motionVectors: Boolean): ShaderStage {
+    override fun createFragmentStages(key: ShaderKey): List<ShaderStage> {
 
         // copied from super mainly
 
-        val original = super.createFragmentStage(isInstanced, isAnimated, motionVectors)
+        val original = super.createFragmentStages(key)
 
-        val fragmentVariables = original.variables + listOf(
+        val fragmentVariables = listOf(
             Variable(GLSLType.V1B, "nearestNeighborColors", VariableMode.IN),
             Variable(GLSLType.V4F, "fluidDataI", VariableMode.IN),
             Variable(GLSLType.S2D, "colorMap"),
@@ -208,7 +192,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
             Variable(GLSLType.V1B, "halfTransparent")
         )
 
-        return ShaderStage(
+        return original + ShaderStage(
             "material", fragmentVariables, "" +
                     "if(halfTransparent && (int(gl_FragCoord.x + gl_FragCoord.y) & 1) == 0) discard;\n" +
                     "if(dot(vec4(finalPosition, 1.0), reflectionCullingPlane) < 0.0) discard;\n" +

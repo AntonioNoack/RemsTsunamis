@@ -3,15 +3,13 @@ package me.anno.tsunamis.engine.gpu
 import me.anno.gpu.GFX
 import me.anno.gpu.GFXState.renderPurely
 import me.anno.gpu.GFXState.useFrame
+import me.anno.gpu.buffer.SimpleBuffer
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
-import me.anno.gpu.shader.OpenGLShader.Companion.attribute
-import me.anno.gpu.shader.Renderer
+import me.anno.gpu.shader.GPUShader.Companion.attribute
 import me.anno.gpu.shader.Shader
-import me.anno.gpu.texture.Clamping
-import me.anno.gpu.texture.GPUFiltering
-import me.anno.gpu.texture.ITexture2D
-import me.anno.gpu.texture.Texture2D
+import me.anno.gpu.shader.renderer.Renderer.Companion.copyRenderer
+import me.anno.gpu.texture.*
 import me.anno.tsunamis.FluidSim
 import org.lwjgl.opengl.GL11
 
@@ -24,8 +22,8 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
     override fun createBuffer(buffer: Framebuffer, data: FloatArray) {
         buffer.ensure() // otherwise getColor() may be undefined
         (buffer.getTexture0() as Texture2D).createRGBA(data, false)
-        for (tex in buffer.textures) {
-            tex.filtering = GPUFiltering.TRULY_NEAREST
+        for (tex in buffer.textures ?: emptyList()) {
+            tex.filtering = Filtering.TRULY_NEAREST
             tex.clamping = Clamping.CLAMP
         }
     }
@@ -33,8 +31,8 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
     override fun createBuffer(buffer: Framebuffer) {
         buffer.ensure()
         (buffer.getTexture0() as Texture2D).createFP32()
-        for (tex in buffer.textures) {
-            tex.filtering = GPUFiltering.TRULY_NEAREST
+        for (tex in buffer.textures ?: emptyList()) {
+            tex.filtering = Filtering.TRULY_NEAREST
             tex.clamping = Clamping.CLAMP
         }
     }
@@ -127,11 +125,11 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
             shader: Shader, src: ITexture2D, dst: Framebuffer,
             gravity: Float, timeScale: Float, minFluidHeight: Float
         ) {
-            useFrame(dst, Renderer.copyRenderer) {
+            useFrame(dst, copyRenderer) {
                 shader.use()
                 initShader(shader, timeScale, gravity, minFluidHeight, src)
-                src.bind(0, GPUFiltering.TRULY_NEAREST, Clamping.CLAMP)
-                GFX.flat01.draw(shader)
+                src.bind(0, Filtering.TRULY_NEAREST, Clamping.CLAMP)
+                SimpleBuffer.flat01.draw(shader)
             }
         }
 

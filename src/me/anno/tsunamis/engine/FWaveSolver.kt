@@ -1,8 +1,9 @@
 package me.anno.tsunamis.engine
 
-import me.anno.engine.ECSRegistry
+import me.anno.engine.OfficialExtensions
 import me.anno.image.ImageWriter
-import me.anno.io.files.FileReference.Companion.getReference
+import me.anno.io.files.Reference.getReference
+import me.anno.jvm.HiddenOpenGLContext
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.setGhostOutflow
 import me.anno.tsunamis.setups.LinearDiscontinuitySetup
@@ -282,7 +283,8 @@ object FWaveSolver {
     @JvmStatic
     fun main(args: Array<String>) {
 
-        ECSRegistry.initWithGFX(512)
+        OfficialExtensions.initForTests()
+        HiddenOpenGLContext.createOpenGL(512)
 
         testBorder()
 

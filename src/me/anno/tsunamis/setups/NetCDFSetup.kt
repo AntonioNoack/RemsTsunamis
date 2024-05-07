@@ -4,11 +4,12 @@ import me.anno.Engine
 import me.anno.ecs.annotations.DebugProperty
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
+import me.anno.engine.OfficialExtensions
+import me.anno.engine.serialization.SerializedProperty
 import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference
-import me.anno.io.files.FileReference.Companion.getReference
 import me.anno.io.files.InvalidRef
-import me.anno.io.serialization.SerializedProperty
+import me.anno.io.files.Reference.getReference
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.io.NetCDFImageCache.getData
 import me.anno.tsunamis.io.VariableImage
@@ -47,7 +48,7 @@ class NetCDFSetup : FluidSimSetup() {
         val testClassName = "ucar.nc2.NetcdfFiles"
         try {
             this.javaClass.classLoader.loadClass(testClassName)
-        } catch (e: ClassNotFoundException){
+        } catch (e: ClassNotFoundException) {
             lastWarning = "$testClassName is missing!"
         } catch (e: NoClassDefFoundError) {
             lastWarning = "$testClassName is missing!"
@@ -189,18 +190,18 @@ class NetCDFSetup : FluidSimSetup() {
 
     override fun clone(): NetCDFSetup {
         val clone = NetCDFSetup()
-        copy(clone)
+        copyInto(clone)
         return clone
     }
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as NetCDFSetup
-        clone.bathymetryFile = bathymetryFile
-        clone.displacementFile = displacementFile
-        clone.shoreCliffHeight = shoreCliffHeight
-        clone.applyAveraging = applyAveraging
-        clone.applyInterpolation = applyInterpolation
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as NetCDFSetup
+        dst.bathymetryFile = bathymetryFile
+        dst.displacementFile = displacementFile
+        dst.shoreCliffHeight = shoreCliffHeight
+        dst.applyAveraging = applyAveraging
+        dst.applyInterpolation = applyInterpolation
     }
 
     override val className: String = "Tsunamis/NetCDFSetup"
@@ -209,8 +210,9 @@ class NetCDFSetup : FluidSimSetup() {
 
         @JvmStatic
         fun main(args: Array<String>) {
+            OfficialExtensions.initForTests()
             val setup = NetCDFSetup()
-            val folder = getReference("E:\\Documents\\Uni\\Master\\WS2122")
+            val folder = getReference("E:/Documents/Uni/Master/WS2122")
             setup.bathymetryFile = folder.getChild("tohoku_gebco08_ucsb3_250m_bath.nc")
             setup.displacementFile = folder.getChild("tohoku_gebco08_ucsb3_250m_displ.nc")
             waitUntil(true) { setup.isReady() }

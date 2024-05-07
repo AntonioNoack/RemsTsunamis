@@ -120,15 +120,15 @@ open class FluidSimSetup : Component() {
 
     override fun clone(): FluidSimSetup {
         val clone = FluidSimSetup()
-        copy(clone)
+        copyInto(clone)
         return clone
     }
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as FluidSimSetup
-        clone.hasBorder = hasBorder
-        clone.borderHeight = borderHeight
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as FluidSimSetup
+        dst.hasBorder = hasBorder
+        dst.borderHeight = borderHeight
     }
 
 }

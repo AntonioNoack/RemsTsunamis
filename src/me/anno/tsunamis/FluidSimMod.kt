@@ -4,19 +4,19 @@ import me.anno.engine.RemsEngine
 import me.anno.extensions.ExtensionLoader
 import me.anno.extensions.mods.Mod
 import me.anno.image.Image
-import me.anno.image.ImageCPUCache
-import me.anno.image.ImageCallback
+import me.anno.image.ImageCache
 import me.anno.image.colormap.LinearColorMap
-import me.anno.io.ISaveable.Companion.registerCustomClass
+import me.anno.io.Saveable.Companion.registerCustomClass
 import me.anno.io.files.FileReference
 import me.anno.io.files.Signature
+import me.anno.io.files.inner.InnerFolderCache
 import me.anno.io.utils.StringMap
-import me.anno.io.zip.InnerFolderCache
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFCache
 import me.anno.tsunamis.io.NetCDFImageCache
 import me.anno.tsunamis.setups.*
 import me.anno.utils.Color.black
+import me.anno.utils.structures.Callback
 import java.io.InputStream
 
 class FluidSimMod : Mod() {
@@ -31,46 +31,50 @@ class FluidSimMod : Mod() {
         Signature("colormap", 0, "<ColorMap")
     )
 
-    private fun readNetCDF(file: FileReference, callback: ImageCallback) {
-        callback(NetCDFImageCache.getData(file, false), null)
+    private fun readNetCDF(file: FileReference, callback: Callback<Image>) {
+        callback.call(NetCDFImageCache.getData(file, false), null)
     }
 
-    private fun readNetCDF(bytes: ByteArray): Image? {
+    private fun readNetCDF(bytes: ByteArray, callback: Callback<Image>) {
+        callback.call(readNetCDF0(bytes), null)
+    }
+
+    private fun readNetCDF0(bytes: ByteArray): Image? {
         return NetCDFImageCache.getData(bytes, null)
     }
 
-    private fun readNetCDF(inputStream: InputStream): Image? {
-        val bytes = inputStream.readBytes()
-        inputStream.close()
-        return readNetCDF(bytes)
+    private fun readNetCDF(inputStream: InputStream, callback: Callback<Image>) {
+        val bytes = inputStream.use { it.readBytes() }
+        callback.call(readNetCDF0(bytes), null)
     }
 
-    private fun readColorMap(bytes: ByteArray): Image? {
-        return bytes.inputStream().use { ColorMap.read(it) }
+    private fun readColorMap(bytes: ByteArray, callback: Callback<Image>) {
+        bytes.inputStream().use { callback.call(ColorMap.read(it), null) }
     }
 
-    private fun readColorMap(file: FileReference, callback: ImageCallback) {
-        callback(file.inputStreamSync().use { ColorMap.read(it) }, null)
+    private fun readColorMap(file: FileReference, callback: Callback<Image>) {
+        file.inputStream { it, err ->
+            if (it != null) callback.call(ColorMap.read(it), null)
+            else err?.printStackTrace()
+        }
     }
 
-    private fun readColorMap(inputStream: InputStream): Image? {
-        return inputStream.use { ColorMap.read(it) }
+    private fun readColorMap(inputStream: InputStream, callback: Callback<Image>) {
+        inputStream.use { callback.call(ColorMap.read(it), null) }
     }
 
     override fun onPreInit() {
         super.onPreInit()
 
         // register the NetCDF file signature, and image readers for it
-        for (s in netCDFSignatures)
-            Signature.register(s)
-        ImageCPUCache.registerReader("netcdf", ::readNetCDF, ::readNetCDF, ::readNetCDF)
-        ImageCPUCache.registerReader("nc", ::readNetCDF, ::readNetCDF, ::readNetCDF)
-        InnerFolderCache.register("netcdf", NetCDFCache::readAsFolder)
+        for (s in netCDFSignatures) Signature.register(s)
+        ImageCache.registerReader("netcdf", ::readNetCDF, ::readNetCDF, ::readNetCDF)
+        ImageCache.registerReader("nc", ::readNetCDF, ::readNetCDF, ::readNetCDF)
+        InnerFolderCache.registerSignatures("netcdf", NetCDFCache::readAsFolder)
 
         // register color map preview
-        for (s in colorMapSignatures)
-            Signature.register(s)
-        ImageCPUCache.registerReader("colormap", ::readColorMap, ::readColorMap, ::readColorMap)
+        for (s in colorMapSignatures) Signature.register(s)
+        ImageCache.registerReader("colormap", ::readColorMap, ::readColorMap, ::readColorMap)
 
         // register components
         registerCustomClass(FluidSim())
@@ -81,6 +85,7 @@ class FluidSimMod : Mod() {
         registerCustomClass(CriticalFlowSetup())
         registerCustomClass(PoolSetup())
         registerCustomClass(ParabolaSetup())
+        registerCustomClass(ManualProceduralMesh())
 
     }
 

@@ -2,11 +2,8 @@ package me.anno.tsunamis.engine.gpu
 
 import me.anno.gpu.GFX
 import me.anno.gpu.framebuffer.Framebuffer
-import me.anno.gpu.shader.OpenGLShader
-import me.anno.gpu.texture.Clamping
-import me.anno.gpu.texture.GPUFiltering
-import me.anno.gpu.texture.ITexture2D
-import me.anno.gpu.texture.Texture2D
+import me.anno.gpu.shader.GPUShader
+import me.anno.gpu.texture.*
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
@@ -81,22 +78,22 @@ abstract class GPUEngine<Buffer>(
         fun initTextures(fb: Framebuffer) {
             fb.autoUpdateMipmaps = false
             fb.ensure()
-            for (tex in fb.textures) {
+            for (tex in fb.textures ?: emptyList()) {
                 initTexture(tex)
             }
         }
 
         fun initTexture(tex: Texture2D) {
             tex.autoUpdateMipmaps = false
-            tex.filtering = GPUFiltering.TRULY_NEAREST
+            tex.filtering = Filtering.TRULY_NEAREST
             tex.clamping = Clamping.CLAMP
         }
 
-        fun initShader(shader: OpenGLShader, timeScale: Float, gravity: Float, minFluidHeight: Float, src: ITexture2D) {
+        fun initShader(shader: GPUShader, timeScale: Float, gravity: Float, minFluidHeight: Float, src: ITexture2D) {
             shader.v1f("timeScale", timeScale)
             shader.v1f("gravity", gravity)
             shader.v1f("minFluidHeight", minFluidHeight)
-            shader.v2i("maxUV", src.w - 1, src.h - 1)
+            shader.v2i("maxUV", src.width - 1, src.height - 1)
         }
 
     }

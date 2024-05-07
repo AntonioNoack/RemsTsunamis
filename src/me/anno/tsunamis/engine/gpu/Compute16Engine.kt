@@ -99,7 +99,7 @@ class Compute16Engine(
         initTexture(bathymetryTex)
         bathymetryTex.create(
             if (bathymetryFp16) FP16x1
-            else TargetType.FloatTarget1
+            else TargetType.Float32x1
         )
 
         setFromTextureRGBA32F(rendered)
@@ -111,11 +111,11 @@ class Compute16Engine(
         shader.use()
         shader.v2i("maxUV", width - 1, height - 1)
         // bind all textures
-        ComputeShader.bindTexture(0, texture, ComputeTextureMode.READ, GL_RGBA32F)
-        ComputeShader.bindTexture(1, surface0, ComputeTextureMode.WRITE, GL_R16F)
-        ComputeShader.bindTexture(2, momentumX0, ComputeTextureMode.WRITE, GL_R16F)
-        ComputeShader.bindTexture(3, momentumY0, ComputeTextureMode.WRITE, GL_R16F)
-        ComputeShader.bindTexture(4, bathymetryTex, ComputeTextureMode.WRITE, if (bathymetryFp16) GL_R16F else GL_R32F)
+        shader.bindTexture(0, texture, ComputeTextureMode.READ, GL_RGBA32F)
+        shader.bindTexture(1, surface0, ComputeTextureMode.WRITE, GL_R16F)
+        shader.bindTexture(2, momentumX0, ComputeTextureMode.WRITE, GL_R16F)
+        shader.bindTexture(3, momentumY0, ComputeTextureMode.WRITE, GL_R16F)
+        shader.bindTexture(4, bathymetryTex, ComputeTextureMode.WRITE, if (bathymetryFp16) GL_R16F else GL_R32F)
         shader.runBySize(width, height)
         isEvenIteration = true
         hasChanged = true
@@ -169,26 +169,11 @@ class Compute16Engine(
             shader.use()
             shader.v2i("maxUV", width - 1, height - 1)
             // bind all textures
-            ComputeShader.bindTexture(0, rendered, ComputeTextureMode.WRITE)
-            ComputeShader.bindTexture(1, surface0, ComputeTextureMode.READ, GL_R16F)
-            ComputeShader.bindTexture(
-                2,
-                if (isEvenIteration) momentumX0 else momentumX1,
-                ComputeTextureMode.READ,
-                GL_R16F
-            )
-            ComputeShader.bindTexture(
-                3,
-                if (isEvenIteration) momentumY0 else momentumY1,
-                ComputeTextureMode.READ,
-                GL_R16F
-            )
-            ComputeShader.bindTexture(
-                4,
-                bathymetryTex,
-                ComputeTextureMode.READ,
-                if (bathymetryFp16) GL_R16F else GL_R32F
-            )
+            shader.bindTexture(0, rendered, ComputeTextureMode.WRITE)
+            shader.bindTexture(1, surface0, ComputeTextureMode.READ, GL_R16F)
+            shader.bindTexture(2, if (isEvenIteration) momentumX0 else momentumX1, ComputeTextureMode.READ, GL_R16F)
+            shader.bindTexture(3, if (isEvenIteration) momentumY0 else momentumY1, ComputeTextureMode.READ, GL_R16F)
+            shader.bindTexture(4, bathymetryTex, ComputeTextureMode.READ, if (bathymetryFp16) GL_R16F else GL_R32F)
             shader.runBySize(width, height)
             hasChanged = false
         }
@@ -218,12 +203,12 @@ class Compute16Engine(
         ) {
             shader.use()
             initShader(shader, timeScale, gravity, minFluidHeight, srcSurface)
-            ComputeShader.bindTexture(0, srcSurface, ComputeTextureMode.READ, GL_R16F)
-            ComputeShader.bindTexture(1, srcMomentum, ComputeTextureMode.READ, GL_R16F)
-            ComputeShader.bindTexture(2, dstSurface, ComputeTextureMode.WRITE, GL_R16F)
-            ComputeShader.bindTexture(3, dstMomentum, ComputeTextureMode.WRITE, GL_R16F)
-            ComputeShader.bindTexture(4, bathymetry, ComputeTextureMode.READ, if (bathymetryHalf) GL_R16F else GL_R32F)
-            shader.runBySize(srcSurface.w, srcSurface.h)
+            shader.bindTexture(0, srcSurface, ComputeTextureMode.READ, GL_R16F)
+            shader.bindTexture(1, srcMomentum, ComputeTextureMode.READ, GL_R16F)
+            shader.bindTexture(2, dstSurface, ComputeTextureMode.WRITE, GL_R16F)
+            shader.bindTexture(3, dstMomentum, ComputeTextureMode.WRITE, GL_R16F)
+            shader.bindTexture(4, bathymetry, ComputeTextureMode.READ, if (bathymetryHalf) GL_R16F else GL_R32F)
+            shader.runBySize(srcSurface.width, srcSurface.height)
         }
 
     }

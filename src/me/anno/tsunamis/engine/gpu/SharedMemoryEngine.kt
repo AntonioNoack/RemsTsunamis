@@ -7,6 +7,7 @@ import me.anno.gpu.shader.ComputeTextureMode
 import me.anno.gpu.texture.Texture2D
 import me.anno.maths.Maths.ceilDiv
 import org.joml.Vector2i
+import org.joml.Vector3i
 
 class SharedMemoryEngine(width: Int, height: Int) :
     ComputeEngine(width, height) {
@@ -38,7 +39,7 @@ class SharedMemoryEngine(width: Int, height: Int) :
             val p = if (x) "xyw" else "xzw"
             return ComputeShader(
                 if (x) "computeTimeStep(x)" else "computeTimeStep(y)",
-                Vector2i(updateSize), "" +
+                Vector3i(updateSize, updateSize, 1), listOf(), "" +
                         "precision highp float;\n" +
                         "layout(rgba32f, binding = 0) uniform image2D src;\n" +
                         "layout(rgba32f, binding = 1) uniform image2D dst;\n" +
@@ -85,14 +86,14 @@ class SharedMemoryEngine(width: Int, height: Int) :
         ) {
             shader.use()
             initShader(shader, timeScale, gravity, minFluidHeight, src)
-            ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
-            ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            shader.bindTexture(0, src, ComputeTextureMode.READ)
+            shader.bindTexture(1, dst, ComputeTextureMode.WRITE)
             if (x) {
-                // we need extra groups on the x axis
-                shader.runBySize(ceilDiv(src.w * updateSize, writeSize), src.h)
+                // we need extra groups on the x-axis
+                shader.runBySize(ceilDiv(src.width * updateSize, writeSize), src.height)
             } else {
-                // extra groups, but for the y axis
-                shader.runBySize(src.w, ceilDiv(src.h * updateSize, writeSize))
+                // extra groups, but for the y-axis
+                shader.runBySize(src.width, ceilDiv(src.height * updateSize, writeSize))
             }
         }
 

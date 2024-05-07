@@ -2,13 +2,14 @@ package me.anno.tsunamis.engine.gpu
 
 import me.anno.gpu.shader.ComputeShader
 import org.joml.Vector2i
+import org.joml.Vector3i
 
 class Compute16Shaders private constructor(bathymetryHalf: Boolean) {
 
     private val bty = if (bathymetryHalf) "r16f" else "r32f"
 
     val splitShader = ComputeShader(
-        "split16", Vector2i(16), "" +
+        "split16", Vector3i(16, 16, 1), listOf(), "" +
                 "precision highp float;\n" +
                 "layout(rgba32f, binding = 0) uniform image2D src;\n" +
                 "layout(r16f, binding = 1) uniform image2D dstSurface;\n" +
@@ -29,7 +30,7 @@ class Compute16Shaders private constructor(bathymetryHalf: Boolean) {
     )
 
     val mergeShader = ComputeShader(
-        "merge16", Vector2i(16), "" +
+        "merge16", Vector3i(16, 16, 1), listOf(), "" +
                 "precision highp float;\n" +
                 "layout(rgba32f, binding = 0) uniform image2D dst;\n" +
                 "layout(r16f, binding = 1) uniform image2D srcSurface;\n" +
@@ -52,7 +53,7 @@ class Compute16Shaders private constructor(bathymetryHalf: Boolean) {
     private fun createShader(x: Boolean): ComputeShader {
         return ComputeShader(
             if (x) "computeTimeStep16(x)" else "computeTimeStep16(y)",
-            Vector2i(16), "" +
+            Vector3i(16, 16, 1), listOf(), "" +
                     "precision highp float;\n" +
                     "layout(r16f, binding = 0) uniform image2D srcSurface;\n" +
                     "layout(r16f, binding = 1) uniform image2D srcMomentum;\n" +

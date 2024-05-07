@@ -1,6 +1,7 @@
 package me.anno.tsunamis.io
 
 import me.anno.Engine
+import me.anno.Time
 import me.anno.cache.CacheSection
 import me.anno.io.files.FileReference
 import me.anno.io.files.InvalidRef
@@ -13,7 +14,7 @@ object NetCDFImageCache : CacheSection("NetCDF-Images") {
 
     fun getData(bytes: ByteArray, variableName: String?): VariableImage? {
         synchronized(NetCDFMutex) {
-            val data = NetcdfFiles.openInMemory(Engine.nanoTime.toString(), bytes)
+            val data = NetcdfFiles.openInMemory(Time.nanoTime.toString(), bytes)
             val image = getData(data, variableName)
             data.close()
             return image
@@ -23,7 +24,7 @@ object NetCDFImageCache : CacheSection("NetCDF-Images") {
     fun getData(file: FileReference, async: Boolean): VariableImage? {
         return if (file.isDirectory) {
             // we have specified the variable name like a folder
-            getData(file.getParent() ?: InvalidRef, file.name, async)
+            getData(file.getParent(), file.name, async)
         } else {
             // we don't have specified it
             getData(file, null, async)

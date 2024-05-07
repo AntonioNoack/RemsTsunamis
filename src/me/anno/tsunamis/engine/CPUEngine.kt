@@ -1,10 +1,10 @@
 package me.anno.tsunamis.engine
 
 import me.anno.ecs.components.mesh.ProceduralMesh
+import me.anno.engine.serialization.NotSerializedProperty
 import me.anno.gpu.GFX
 import me.anno.gpu.texture.Texture2D
-import me.anno.gpu.texture.Texture2D.Companion.readAlignment
-import me.anno.io.serialization.NotSerializedProperty
+import me.anno.gpu.texture.Texture2D.Companion.setReadAlignment
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.FluidSim.Companion.threadPool
 import me.anno.tsunamis.Visualisation
@@ -101,8 +101,8 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         val hv = fluidMomentumY
         val b = bathymetry
 
-        val width = texture.w
-        val height = texture.h
+        val width = texture.width
+        val height = texture.height
 
         val stride = width + 2
         val offset = stride + 1 // (1,1)
@@ -305,7 +305,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
     override fun requestFluidTexture(cw: Int, ch: Int): Texture2D {
         fluidTexture.setSize(cw, ch)
-        val buffer = fbPool[fluidTexture.w * fluidTexture.h * 4, false, false]
+        val buffer = fbPool[fluidTexture.width * fluidTexture.height * 4, false, false]
         val data = createTextureData(width + 2, height + 2, cw + 2, ch + 2, this, buffer)
         fluidTexture.autoUpdateMipmaps = false
         fluidTexture.createRGBA(data, false)
@@ -328,8 +328,8 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
         fun getPixels(texture: Texture2D): Pair<FloatBuffer, ByteBuffer> {
 
-            val width = texture.w
-            val height = texture.h
+            val width = texture.width
+            val height = texture.height
 
             val data = Texture2D.bufferPool[width * height * 4 * 4, false, false]
                 .order(ByteOrder.nativeOrder())
@@ -341,7 +341,7 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
 
             Texture2D.bindTexture(texture.target, texture.pointer)
 
-            readAlignment(width * height * 4)
+            setReadAlignment(width * height * 4)
             glGetTexImage(texture.target, 0, GL_RGBA, GL_FLOAT, floats)
 
             return Pair(floats, data)

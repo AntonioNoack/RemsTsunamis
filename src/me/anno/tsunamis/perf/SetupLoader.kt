@@ -2,8 +2,9 @@ package me.anno.tsunamis.perf
 
 import me.anno.io.files.FileReference
 import me.anno.io.files.InvalidRef
-import me.anno.io.yaml.YAMLNode
-import me.anno.io.yaml.YAMLReader
+import me.anno.io.files.Reference.getReference
+import me.anno.io.yaml.generic.YAMLNode
+import me.anno.io.yaml.generic.YAMLReader
 import me.anno.tsunamis.setups.*
 import me.anno.utils.Sleep
 import org.apache.logging.log4j.LogManager
@@ -34,7 +35,7 @@ object SetupLoader {
     fun YAMLNode?.getOrDefault(key: String, default: FileReference): FileReference {
         this ?: return default
         val v = this[key]?.value ?: return default
-        return FileReference.Companion.getReference(v)
+        return getReference(v)
     }
 
     fun YAMLNode?.getOrDefault(key: String, default: Float): Float {
@@ -66,7 +67,7 @@ object SetupLoader {
 
     fun load(args: Array<String>): Setup {
         val ref = if (args.isEmpty()) InvalidRef
-        else FileReference.Companion.getReference(args[0])
+        else getReference(args[0])
         return load(ref)
     }
 
@@ -74,9 +75,9 @@ object SetupLoader {
 
         var setup: FluidSimSetup = NetCDFSetup()
         if (setup is NetCDFSetup) {
-            val folder = FileReference.getReference("E:/Documents/Uni/Master/WS2122")
-            setup.bathymetryFile = FileReference.getReference(folder, "tohoku_gebco08_ucsb3_250m_bath.nc")
-            setup.displacementFile = FileReference.getReference(folder, "tohoku_gebco08_ucsb3_250m_displ.nc")
+            val folder = getReference("E:/Documents/Uni/Master/WS2122")
+            setup.bathymetryFile = folder.getChild("tohoku_gebco08_ucsb3_250m_bath.nc")
+            setup.displacementFile = folder.getChild("tohoku_gebco08_ucsb3_250m_displ.nc")
         }
 
         var width = 100
@@ -107,7 +108,7 @@ object SetupLoader {
             outputStepSize: 12
             outputPeriod: 15
             * */
-            config = YAMLReader.parseYAML(file, beautify = false)
+            config = YAMLReader.parseYAML(file.inputStreamSync().bufferedReader(), beautify = false)
 
 
             // + 2 for ghost cells
@@ -189,7 +190,8 @@ object SetupLoader {
                     setup.bowWidth = config.getOrDefault("bowWidth", 0.2f)
                     setup.bowPower = config.getOrDefault("bowPower", 2f)
                 }
-                "Supercritical", "SupercriticalFlow", "SupercriticalFlow1d" -> {setup = CriticalFlowSetup()
+                "Supercritical", "SupercriticalFlow", "SupercriticalFlow1d" -> {
+                    setup = CriticalFlowSetup()
                     setup.shallowDepth = config.getOrDefault("shallowDepth", 0.13f)
                     setup.baseDepth = config.getOrDefault("baseDepth", 0.33f)
                     setup.momentumX = config.getOrDefault("momentumX", 0.18f)

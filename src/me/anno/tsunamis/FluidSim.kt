@@ -1,31 +1,35 @@
 package me.anno.tsunamis
 
-import me.anno.Engine
+import me.anno.Time
 import me.anno.ecs.annotations.*
-import me.anno.ecs.components.cache.MaterialCache
-import me.anno.ecs.components.mesh.*
+import me.anno.ecs.components.mesh.Mesh
+import me.anno.ecs.components.mesh.ProceduralMesh
+import me.anno.ecs.components.mesh.material.Material
+import me.anno.ecs.components.mesh.material.MaterialCache
+import me.anno.ecs.components.mesh.material.utils.TypeValue
 import me.anno.ecs.interfaces.CustomEditMode
 import me.anno.ecs.prefab.Prefab
 import me.anno.ecs.prefab.PrefabSaveable
+import me.anno.engine.raycast.RayQuery
 import me.anno.engine.raycast.Raycast
+import me.anno.engine.serialization.NotSerializedProperty
+import me.anno.engine.serialization.SerializedProperty
 import me.anno.engine.ui.render.RenderState
 import me.anno.engine.ui.render.RenderView
 import me.anno.gpu.CullMode
 import me.anno.gpu.GFX
+import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.FBStack
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.texture.Clamping
 import me.anno.gpu.texture.Texture2D
-import me.anno.image.raw.CompositeFloatImage
-import me.anno.image.raw.FloatBufferImage
 import me.anno.image.raw.FloatImage
 import me.anno.image.raw.IFloatImage
 import me.anno.input.Input
 import me.anno.io.files.FileReference
-import me.anno.io.files.FileReference.Companion.getReference
-import me.anno.io.serialization.NotSerializedProperty
-import me.anno.io.serialization.SerializedProperty
-import me.anno.io.zip.InnerTmpFile
+import me.anno.io.files.Reference.getReference
+import me.anno.io.files.inner.temporary.InnerTmpPrefabFile
+import me.anno.language.translation.NameDesc
 import me.anno.maths.Maths.ceilDiv
 import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.mix
@@ -36,14 +40,16 @@ import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.engine.TsunamiEngine
 import me.anno.tsunamis.engine.gpu.Compute16Engine
 import me.anno.tsunamis.engine.gpu.ComputeEngine.Companion.scaleTextureRGBA32F
+import me.anno.tsunamis.image.CompositeFloatImage
+import me.anno.tsunamis.image.FloatBufferImage
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFExport
 import me.anno.tsunamis.setups.FluidSimSetup
+import me.anno.ui.Style
 import me.anno.ui.base.groups.PanelListY
 import me.anno.ui.base.text.TextPanel
 import me.anno.ui.editor.PropertyInspector
 import me.anno.ui.editor.SettingCategory
-import me.anno.ui.style.Style
 import me.anno.utils.ShutdownException
 import me.anno.utils.hpc.ProcessingGroup
 import me.anno.utils.hpc.ThreadLocal2
@@ -57,13 +63,12 @@ import kotlin.math.min
 /**
  * simple 3d mesh, which simulates water
  * */
-@ExecuteInEditMode
 class FluidSim : ProceduralMesh, CustomEditMode {
 
     constructor()
 
     constructor(base: FluidSim) {
-        base.copy(this)
+        base.copyInto(this)
     }
 
     var engineType: EngineType = EngineType.GPU_COMPUTE_FP16B16 // best performance, so default
@@ -93,7 +98,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     @Group("Visuals")
     @Type("ManualProceduralMesh/PrefabSaveable")
     @SerializedProperty
-    var bathymetryMesh: ManualProceduralMesh? = null
+    var bathymetryMesh: ProceduralMesh? = null
 
     @NotSerializedProperty
     var computeOnly = false
@@ -251,7 +256,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     }
 
     @DebugAction
-    @DebugTitle("Export as NetCDF")
+    @Docs("Export as NetCDF")
     fun exportNetCDF() {
         // export the current state as NetCDF
         // todo we could ask the user to enter a path
@@ -451,7 +456,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     private var simulatedTime = 0.0
 
     private fun computeSimulationSpeed() {
-        val time = Engine.nanoTime
+        val time = Time.nanoTime
         val delta = time - lastStep
         lastStep = time
         val delta2 = simulatedTime - lastSimulatedTime
@@ -470,7 +475,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             }
             if (!isPaused) {
                 val engine = engine!!
-                val dt = Engine.deltaTime * timeFactor
+                val dt = Time.deltaTime.toFloat() * timeFactor
                 if (dt > 0f) {
                     if (engine.supportsAsyncCompute()) {
                         if (computingThread == null) {
@@ -563,11 +568,12 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         material: Material,
         colorMap: ColorMap?,
         cellSize: Float,
-        cw: Int,
-        ch: Int
+        cw: Int, ch: Int
     ) {
         if (colorMap != null) {
-            colorMap.createTexture(colorMapTexture, true, false)
+            colorMap.createTexture(colorMapTexture, true, false) { _, err ->
+                err?.printStackTrace()
+            }
             colorMapTexture.clamping = Clamping.CLAMP
             material["colorMap"] = TypeValue(GLSLType.S2D, colorMapTexture)
             val newMax = colorMap.max * colorMapScale
@@ -711,7 +717,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     fun step(dt: Float, numMaxIterations: Int = maxIterationsPerFrame): Float {
         var done = 0f
         var i = 0
-        val t0 = Engine.nanoTime
+        val t0 = Time.nanoTime
         val engine = engine!!
         while (done < dt && i++ < numMaxIterations) {
             val computeTimeStepInterval = computeTimeStepInterval
@@ -726,7 +732,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 simulatedTime += step
                 timeStepIndex++
             } else break
-            val t1 = Engine.nanoTime
+            val t1 = Time.nanoTime
             if ((t1 - t0) * computeBudgetFPS > 1e9f) break
             Thread.sleep(0) // for interrupts
         }
@@ -767,26 +773,23 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     val lastMousePos = Vector3f()
 
     fun getMousePos(dst: Vector3f): Vector3f {
-        val hit = Raycast.raycast(
-            entity!!,
+        val query = RayQuery(
             RenderState.cameraPosition,
             RenderView.currentInstance!!.mouseDirection,
-            0.0, 0.0, 1e6,
-            Raycast.TRIANGLES,
-            -1,
-            emptySet(),
-            true
+            1e6, 0.0, 0.0,
+            Raycast.TRIANGLES, -1, false, emptySet()
         )
-        if (hit != null) {
+        if (Raycast.raycastClosestHit(entity!!, query)) {
+            val result = query.result
             val transform = transform!!
             val global2Local = transform.globalTransform.invert(Matrix4x3d())
-            val localPosition = global2Local.transformPosition(hit.positionWS, Vector3d())
+            val localPosition = global2Local.transformPosition(result.positionWS, Vector3d())
             val centerX = width * 0.5f
             val centerY = height * 0.5f
             // the local grid positions
             val cellX = (localPosition.x / cellSizeMeters).toFloat() + centerX
             val cellY = (localPosition.z / cellSizeMeters).toFloat() + centerY
-            dst.set(cellX, cellY, hit.distance.toFloat())
+            dst.set(cellX, cellY, result.distance.toFloat())
         } else dst.z = -1f
         return dst
     }
@@ -820,8 +823,8 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             GFX.check()
             invalidateMesh()
             GFX.check()
-            ensureBuffer()
-            GFX.check()
+            // ensureBuffer()
+            // GFX.check()
         } else {
             GFX.addGPUTask("invalidate", 1) {
                 invalidateFluid()
@@ -832,7 +835,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     override fun onEditMove(x: Float, y: Float, dx: Float, dy: Float): Boolean {
         if (Input.isLeftDown) {
             // critical velocity: sqrt(g*h), so make it that we draw that within 10s
-            val time = Engine.nanoTime
+            val time = Time.nanoTime
             val minDt = 1f / 60f
             val deltaTime = (time - lastChange) * 1e-9f
             when {
@@ -846,7 +849,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                         }
                     }
                     // needs to be now (instead of when we started to process this update), so the system doesn't hang, when processing uses too much time
-                    lastChange = Engine.nanoTime
+                    lastChange = Time.nanoTime
                     lastMousePos.set(currentMousePos)
                 }
                 deltaTime > minDt -> {
@@ -875,13 +878,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         }
     }*/
 
-    override fun createInspector(
-        list: PanelListY,
-        style: Style,
-        getGroup: (title: String, description: String, dictSubPath: String) -> SettingCategory
-    ) {
+    override fun createInspector(list: PanelListY, style: Style, getGroup: (nameDesc: NameDesc) -> SettingCategory) {
         super.createInspector(list, style, getGroup)
-        val title = list.findFirstInAll { it is TextPanel && it.text == "Color Map Scale" } as? TextPanel
+        val title = list.listOfAll.firstOrNull { it is TextPanel && it.text == "Color Map Scale" } as? TextPanel
         if (title != null) {
             val group = title.listOfHierarchyReversed.firstInstanceOrNull<PanelListY>()
             if (group != null) {
@@ -899,16 +898,16 @@ class FluidSim : ProceduralMesh, CustomEditMode {
 
     override fun clone() = FluidSim(this)
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as FluidSim
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as FluidSim
         // copy the scalar properties
-        clone.width = width
-        clone.height = height
-        clone.cellSizeMeters = cellSizeMeters
-        clone.gravity = gravity
-        clone.cfl2d = cfl2d
-        clone.timeFactor = timeFactor
+        dst.width = width
+        dst.height = height
+        dst.cellSizeMeters = cellSizeMeters
+        dst.gravity = gravity
+        dst.cfl2d = cfl2d
+        dst.timeFactor = timeFactor
         /*// copy the array properties
         clone.fluidHeight = copy(fluidHeight)
         clone.fluidMomentumX = copy(fluidMomentumX)
@@ -918,17 +917,17 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         clone.tmpH = FloatArray(size)
         clone.tmpHuX = FloatArray(size)
         clone.tmpHuY = FloatArray(size)*/
-        clone.needsUpdate = needsUpdate
-        clone.wantsReset = wantsReset
-        clone.colorMap = colorMap
-        clone.computeTimeStepInterval = computeTimeStepInterval
+        // dst.needsUpdate = needsUpdate
+        dst.wantsReset = wantsReset
+        dst.colorMap = colorMap
+        dst.computeTimeStepInterval = computeTimeStepInterval
         // copy the references
-        clone.setup = getInClone(setup, clone)
-        clone.bathymetryMesh = getInClone(bathymetryMesh, clone)
+        dst.setup = getInClone(setup, dst)
+        dst.bathymetryMesh = getInClone(bathymetryMesh, dst)
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun destroy() {
+        super.destroy()
         getMesh().destroy()
         computingThread?.interrupt()
         computingThread = null
@@ -988,14 +987,14 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             }
             else -> {
                 val tex = engine.requestFluidTexture(w, h)
-                val tex2 = if (tex.w > w || tex.h > h) {
-                    val buffer = FBStack["fluidSim", w, h, 4, true, 1, false]
+                val tex2 = if (tex.width > w || tex.height > h) {
+                    val buffer = FBStack["fluidSim", w, h, 4, true, 1, DepthBufferType.NONE]
                     buffer.ensure()
                     scaleTextureRGBA32F(tex, buffer.getTexture0() as Texture2D)
                 } else tex
                 // get the pixels from the image
                 val (pixels, _) = getPixels(tex2)
-                FloatBufferImage(tex2.w, tex2.h, 4, pixels)
+                FloatBufferImage(tex2.width, tex2.height, 4, pixels)
             }
         }
     }
@@ -1029,10 +1028,22 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             } else {
                 val x = i % cw
                 val y = i / cw
-                val nx = coarseIndexToFine(x, w, cw)
-                val ny = coarseIndexToFine(y, h, ch)
-                nx + ny * w
+                coarseIndexToFine(w, h, cw, ch, x, y)
             }
+        }
+
+        /**
+         * scales down a 2d index from a coarse grid to a fine grid, preserves the border;
+         * w and cw include the ghost cells
+         * @param w width with ghost cells
+         * @param h height with ghost cells
+         * @param cw coarse width with ghost cells
+         * @param ch coarse height with ghost cells
+         * */
+        fun coarseIndexToFine(w: Int, h: Int, cw: Int, ch: Int, x: Int, y: Int): Int {
+            val nx = coarseIndexToFine(x, w, cw)
+            val ny = coarseIndexToFine(y, h, ch)
+            return nx + ny * w
         }
 
         private fun createMaterials(halfPrecision: Boolean): List<FileReference> {
@@ -1043,7 +1054,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 if (halfPrecision) YTextureShader.r16fShader
                 else YTextureShader.rgbaShader
             )
-            return listOf(InnerTmpFile.InnerTmpPrefabFile(prefab))
+            return listOf(InnerTmpPrefabFile(prefab))
         }
 
         val threadPool = ProcessingGroup("TsunamiSim", 1f)

@@ -2,7 +2,6 @@ package me.anno.tsunamis.draw
 
 import me.anno.gpu.GFX
 import me.anno.gpu.framebuffer.Framebuffer
-import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
 import me.anno.gpu.texture.Texture2D
 import me.anno.input.Input
@@ -11,8 +10,8 @@ import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.getMaxValue
 import me.anno.tsunamis.engine.gpu.Compute16Engine
 import me.anno.tsunamis.engine.gpu.GPUEngine
-import me.anno.utils.LOGGER
 import me.anno.utils.hpc.HeavyProcessing
+import org.apache.logging.log4j.LogManager
 import org.joml.Vector3f
 import org.lwjgl.opengl.GL30C.*
 import kotlin.math.abs
@@ -21,6 +20,8 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 object Drawing {
+
+    private val LOGGER = LogManager.getLogger(Drawing::class)
 
     val rgbaShaders = DrawShaders(comp16engine = false, halfPrecisionBath = false)
     private val r16b16 = DrawShaders(comp16engine = true, halfPrecisionBath = true)
@@ -166,10 +167,10 @@ object Drawing {
         shader.v2f("brush", brushStrength, invBrushSize)
         shader.v4f("dw", dwx1, dwy1, dwx2, dwy2)
         GFX.check()
-        ComputeShader.bindTexture(0, src, ComputeTextureMode.READ, format)
-        ComputeShader.bindTexture(1, tmp, ComputeTextureMode.WRITE, format)
+        shader.bindTexture(0, src, ComputeTextureMode.READ, format)
+        shader.bindTexture(1, tmp, ComputeTextureMode.WRITE, format)
         if (bath != null) {
-            ComputeShader.bindTexture(2, bath, ComputeTextureMode.WRITE, bathFormat)
+            shader.bindTexture(2, bath, ComputeTextureMode.WRITE, bathFormat)
         }
         GFX.check()
         shader.runBySize(width, height)
@@ -179,8 +180,8 @@ object Drawing {
         shader.v2i("inSize", width, height)
         shader.v2i("offset", cellMinX, cellMinY)
         GFX.check()
-        ComputeShader.bindTexture(0, tmp, ComputeTextureMode.READ, format)
-        ComputeShader.bindTexture(1, src, ComputeTextureMode.WRITE, format)
+        shader.bindTexture(0, tmp, ComputeTextureMode.READ, format)
+        shader.bindTexture(1, src, ComputeTextureMode.WRITE, format)
         GFX.check()
         shader.runBySize(width, height)
         GFX.check()

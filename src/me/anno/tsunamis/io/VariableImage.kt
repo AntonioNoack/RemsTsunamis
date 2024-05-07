@@ -85,25 +85,7 @@ class VariableImage(variable: Variable) : Image(
         )
     }
 
-    override fun createBufferedImage(dstWidth: Int, dstHeight: Int): BufferedImage {
-        val image = BufferedImage(dstWidth, dstHeight, 1)
-        val raster = image.raster.dataBuffer
-        val width = width
-        val height = height
-        // quick & dirty without averaging
-        // for faster previews
-        for (y in 0 until dstHeight) {
-            var i = y * dstWidth
-            for (x in 0 until dstWidth) {
-                raster.setElem(i++, getRGB(x * width / dstWidth, y * height / dstHeight))
-            }
-        }
-        return image
-    }
-
     companion object {
-
-        private const val black = 0xff shl 24
 
         fun getWidth(variable: Variable): Int {
             val shape = variable.shape

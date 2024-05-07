@@ -5,12 +5,12 @@ import me.anno.cache.CacheSection
 import me.anno.ecs.annotations.DebugProperty
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
+import me.anno.engine.serialization.SerializedProperty
 import me.anno.image.ImageWriter
 import me.anno.image.colormap.LinearColorMap
 import me.anno.io.csv.CSVReader
 import me.anno.io.files.FileReference
 import me.anno.io.files.InvalidRef
-import me.anno.io.serialization.SerializedProperty
 import me.anno.maths.Maths.mix
 import me.anno.maths.Maths.unmix
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.setGhostOutflow
@@ -35,14 +35,16 @@ class GMTTrackSetup : FluidSimSetup() {
     var applyAveraging = true
 
     /**
-     * relative start of the displacement, [0,1]
+     * relative start of the displacement
      * */
+    @Range(0.0, 1.0)
     @SerializedProperty
     var displacementStart = 0.1f
 
     /**
-     * relative end of the displacement, [0,1]
+     * relative end of the displacement
      * */
+    @Range(0.0, 1.0)
     @SerializedProperty
     var displacementEnd = 0.2f
 
@@ -195,17 +197,20 @@ class GMTTrackSetup : FluidSimSetup() {
 
     override fun clone(): GMTTrackSetup {
         val clone = GMTTrackSetup()
-        copy(clone)
+        copyInto(clone)
         return clone
     }
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as GMTTrackSetup
-        clone.sourceFile = sourceFile
-        clone.shoreCliffHeight = shoreCliffHeight
-        clone.applyAveraging = applyAveraging
-        clone.applyInterpolation = applyInterpolation
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as GMTTrackSetup
+        dst.sourceFile = sourceFile
+        dst.shoreCliffHeight = shoreCliffHeight
+        dst.applyAveraging = applyAveraging
+        dst.applyInterpolation = applyInterpolation
+        dst.displacementStart = displacementStart
+        dst.displacementHeight = displacementHeight
+        dst.displacementEnd = displacementEnd
     }
 
     override val className: String = "Tsunamis/GMTTrackSetup"

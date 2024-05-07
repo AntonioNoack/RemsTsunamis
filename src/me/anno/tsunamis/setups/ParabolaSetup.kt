@@ -3,7 +3,7 @@ package me.anno.tsunamis.setups
 import me.anno.ecs.annotations.Docs
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
-import me.anno.io.serialization.SerializedProperty
+import me.anno.engine.serialization.SerializedProperty
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
@@ -59,16 +59,18 @@ class ParabolaSetup : FluidSimSetup() {
 
     override fun clone(): ParabolaSetup {
         val clone = ParabolaSetup()
-        copy(clone)
+        copyInto(clone)
         return clone
     }
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as ParabolaSetup
-        clone.poolDepth = poolDepth
-        clone.displacementHeight = displacementHeight
-        clone.displacementFractionX = displacementFractionX
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as ParabolaSetup
+        dst.poolDepth = poolDepth
+        dst.displacementHeight = displacementHeight
+        dst.displacementFractionX = displacementFractionX
+        dst.displacementFractionZ = displacementFractionZ
+        dst.maxBathymetry = maxBathymetry
     }
 
     override val className: String = "Tsunamis/ParabolaSetup"

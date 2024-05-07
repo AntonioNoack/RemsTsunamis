@@ -8,8 +8,8 @@ import me.anno.maths.Maths.mix
 import me.anno.tsunamis.FluidSimMod.Companion.linColorMap
 import me.anno.tsunamis.io.ColorMap
 import me.anno.ui.Panel
-import me.anno.ui.base.constraints.AxisAlignment
-import me.anno.ui.style.Style
+import me.anno.ui.Style
+import me.anno.ui.base.components.AxisAlignment
 import me.anno.utils.Color.black
 import kotlin.math.max
 import kotlin.math.min
@@ -25,8 +25,6 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
     override fun calculateSize(w: Int, h: Int) {
         minW = maxW
         minH = maxH
-        this.w = minW
-        this.h = minH
     }
 
     override fun onDraw(x0: Int, y0: Int, x1: Int, y1: Int) {
@@ -34,7 +32,7 @@ class ColorMapPreview(val sim: FluidSim, style: Style) : Panel(style) {
         val font = monospaceFont
         val xs = x + padding
         val ys = y + padding + font.sampleHeight / 2
-        val ye = y + h - padding - font.sampleHeight / 2
+        val ye = y + height - padding - font.sampleHeight / 2
         // draw colors
         var colorMap: ColorMap? = null
         if (sim.visualization == Visualisation.HEIGHT_MAP) {

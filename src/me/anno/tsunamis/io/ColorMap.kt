@@ -4,26 +4,23 @@ import me.anno.cache.CacheSection
 import me.anno.image.Image
 import me.anno.image.ImageWriter
 import me.anno.io.files.FileReference
-import me.anno.io.files.FileReference.Companion.getReference
-import me.anno.io.xml.XMLNode
-import me.anno.io.xml.XMLReader
+import me.anno.io.files.Reference.getReference
+import me.anno.io.xml.generic.XMLNode
+import me.anno.io.xml.generic.XMLReader
+import me.anno.maths.Maths.max
+import me.anno.maths.Maths.min
+import me.anno.maths.Maths.mix
 import me.anno.ui.editor.color.ColorSpace
 import me.anno.ui.editor.color.spaces.HSV
 import me.anno.utils.Color.a
 import me.anno.utils.Color.b
 import me.anno.utils.Color.g
+import me.anno.utils.Color.mixARGB
 import me.anno.utils.Color.r
 import me.anno.utils.Color.rgba
-import me.anno.maths.Maths.max
-import me.anno.maths.Maths.min
-import me.anno.maths.Maths.mix
-import me.anno.maths.Maths.mixARGB
 import me.anno.utils.structures.arrays.FloatArrayList
 import me.anno.utils.structures.arrays.IntArrayList
 import org.joml.Vector3f
-import java.awt.image.BufferedImage
-import java.awt.image.BufferedImage.TYPE_INT_ARGB
-import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.InputStream
 
 /**
@@ -34,7 +31,7 @@ class ColorMap(
     val colors: IntArray,
     val heights: FloatArray
 ) : Image(colors.size * previewScale, 1, 3,
-        !colors.all { it.a() == 0 } || !colors.all { it.a() == 255 }) {
+    !colors.all { it.a() == 0 } || !colors.all { it.a() == 255 }) {
 
     val min = heights.first()
     val max = heights.last()
@@ -61,21 +58,6 @@ class ColorMap(
         if (colors.size == 1) return colors[0]
         val relativeIndex = index.toFloat() / (width - 1f)
         return getColor(mix(min, max, relativeIndex))
-    }
-
-    override fun createBufferedImage(dstWidth: Int, dstHeight: Int): BufferedImage {
-        val image = BufferedImage(dstWidth, 1, if (hasAlphaChannel) TYPE_INT_ARGB else TYPE_INT_RGB)
-        val raster = image.raster
-        val data = raster.dataBuffer
-        for (index in 0 until dstWidth) {
-            val relativeIndex = index.toFloat() / (dstWidth - 1f)
-            data.setElem(index, getColor(mix(min, max, relativeIndex)))
-        }
-        return image
-    }
-
-    override fun destroy() {
-
     }
 
     companion object {
@@ -161,7 +143,7 @@ class ColorMap(
         }
 
         fun read(input: InputStream): ColorMap? {
-            val xmlData = XMLReader.parse(input)
+            val xmlData = XMLReader().read(input)
             return if (xmlData is XMLNode) {
                 val colors = IntArrayList(16)
                 val heights = FloatArrayList(16)
@@ -193,6 +175,5 @@ class ColorMap(
                 map.getColor(mix(x / w.toFloat() * 1.1f - 0.05f, map.min, map.max))
             }
         }
-
     }
 }

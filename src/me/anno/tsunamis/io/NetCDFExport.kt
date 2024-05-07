@@ -4,16 +4,18 @@ import me.anno.image.raw.IFloatImage
 import me.anno.io.files.FileReference
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
-import me.anno.utils.LOGGER
 import me.anno.utils.OS.documents
 import me.anno.utils.Sleep.waitUntil
 import me.anno.utils.hpc.HeavyProcessing.processBalanced
+import org.apache.logging.log4j.LogManager
 import ucar.ma2.DataType
 import ucar.ma2.Index
 import ucar.nc2.write.NetcdfFormatWriter
 import kotlin.concurrent.thread
 
 object NetCDFExport {
+
+    private val LOGGER = LogManager.getLogger(NetCDFExport::class)
 
     private fun removeBorder(width: Int, height: Int, src: FloatArray, dst: FloatArray): FloatArray {
         if (src.size == dst.size) return src // already done

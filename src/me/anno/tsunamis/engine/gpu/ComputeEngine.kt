@@ -6,7 +6,7 @@ import me.anno.gpu.shader.ComputeTextureMode
 import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.draw.Drawing
 import me.anno.tsunamis.engine.gpu.GraphicsEngine.Companion.synchronizeGraphics
-import org.joml.Vector2i
+import org.joml.Vector3i
 import org.lwjgl.opengl.GL42C.GL_ALL_BARRIER_BITS
 import org.lwjgl.opengl.GL42C.glMemoryBarrier
 
@@ -57,7 +57,7 @@ open class ComputeEngine(width: Int, height: Int) :
 
         private val scaleShader by lazy {
             ComputeShader(
-                "scale-down", Vector2i(16), "" +
+                "scale-down", Vector3i(16, 16, 1), listOf(), "" +
                         "layout(rgba32f, binding = 0) uniform image2D src;\n" +
                         "layout(rgba32f, binding = 1) uniform image2D dst;\n" +
                         "uniform ivec2 outSize;\n" +
@@ -75,24 +75,24 @@ open class ComputeEngine(width: Int, height: Int) :
         fun scaleTextureRGBA32F(src: Texture2D, dst: Texture2D): Texture2D {
             val shader = scaleShader
             shader.use()
-            shader.v2f("scale", src.w.toFloat() / dst.w.toFloat(), src.h.toFloat() / dst.h.toFloat())
-            shader.v2i("outSize", dst.w, dst.h)
-            ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
-            ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
-            shader.runBySize(dst.w, dst.h)
+            shader.v2f("scale", src.width.toFloat() / dst.width.toFloat(), src.height.toFloat() / dst.height.toFloat())
+            shader.v2i("outSize", dst.width, dst.height)
+            shader.bindTexture(0, src, ComputeTextureMode.READ)
+            shader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            shader.runBySize(dst.width, dst.height)
             GFX.check()
             return dst
         }
 
         fun copyTextureRGBA32F(src: Texture2D, dst: Texture2D): Texture2D {
-            if (src.w != dst.w || src.h != dst.h) throw IllegalArgumentException("Textures must have same size")
+            if (src.width != dst.width || src.height != dst.height) throw IllegalArgumentException("Textures must have same size")
             val shader = Drawing.rgbaShaders.copyShader
             shader.use()
             shader.v2i("offset", 0, 0)
-            shader.v2i("inSize", src.w, src.h)
-            ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
-            ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
-            shader.runBySize(src.w, src.h)
+            shader.v2i("inSize", src.width, src.height)
+            shader.bindTexture(0, src, ComputeTextureMode.READ)
+            shader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            shader.runBySize(src.width, src.height)
             GFX.check()
             return dst
         }
@@ -107,7 +107,7 @@ open class ComputeEngine(width: Int, height: Int) :
             val p = if (x) "xyw" else "xzw"
             return ComputeShader(
                 if (x) "computeTimeStep(x)" else "computeTimeStep(y)",
-                Vector2i(16), "" +
+                Vector3i(16, 16, 1), listOf(), "" +
                         "precision highp float;\n" +
                         "layout(rgba32f, binding = 0) uniform image2D src;\n" +
                         "layout(rgba32f, binding = 1) uniform image2D dst;\n" +
@@ -140,9 +140,9 @@ open class ComputeEngine(width: Int, height: Int) :
         ) {
             shader.use()
             initShader(shader, timeScale, gravity, minFluidHeight, src)
-            ComputeShader.bindTexture(0, src, ComputeTextureMode.READ)
-            ComputeShader.bindTexture(1, dst, ComputeTextureMode.WRITE)
-            shader.runBySize(src.w, src.h)
+            shader.bindTexture(0, src, ComputeTextureMode.READ)
+            shader.bindTexture(1, dst, ComputeTextureMode.WRITE)
+            shader.runBySize(src.width, src.height)
         }
 
     }

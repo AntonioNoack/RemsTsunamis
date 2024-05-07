@@ -1,7 +1,7 @@
 package me.anno.tsunamis.setups
 
 import me.anno.ecs.prefab.PrefabSaveable
-import me.anno.io.serialization.SerializedProperty
+import me.anno.engine.serialization.SerializedProperty
 import me.anno.tsunamis.FluidSim
 import kotlin.math.max
 
@@ -10,7 +10,7 @@ class LinearDiscontinuitySetup : FluidSimSetup {
     constructor()
 
     constructor(base: LinearDiscontinuitySetup) {
-        base.copy(this)
+        base.copyInto(this)
     }
 
     @SerializedProperty
@@ -52,17 +52,20 @@ class LinearDiscontinuitySetup : FluidSimSetup {
 
     override fun clone() = LinearDiscontinuitySetup(this)
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as LinearDiscontinuitySetup
-        clone.heightLeft = heightLeft
-        clone.heightRight = heightRight
-        clone.impulseLeft = impulseLeft
-        clone.impulseRight = impulseRight
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as LinearDiscontinuitySetup
+        dst.heightLeft = heightLeft
+        dst.heightRight = heightRight
+        dst.impulseLeft = impulseLeft
+        dst.impulseRight = impulseRight
+        dst.bathymetryLeft = bathymetryLeft
+        dst.bathymetryRight = bathymetryRight
     }
 
     override val className: String = "Tsunamis/LinearDiscontinuitySetup"
 
-    override fun toString() = "LinearDiscontinuitySetup($heightLeft, $heightRight, $impulseLeft, $impulseRight, $bathymetryLeft, $bathymetryRight)"
+    override fun toString() =
+        "LinearDiscontinuitySetup($heightLeft, $heightRight, $impulseLeft, $impulseRight, $bathymetryLeft, $bathymetryRight)"
 
 }

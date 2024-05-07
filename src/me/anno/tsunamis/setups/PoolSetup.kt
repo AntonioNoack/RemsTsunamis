@@ -3,7 +3,7 @@ package me.anno.tsunamis.setups
 import me.anno.ecs.annotations.Docs
 import me.anno.ecs.annotations.Range
 import me.anno.ecs.prefab.PrefabSaveable
-import me.anno.io.serialization.SerializedProperty
+import me.anno.engine.serialization.SerializedProperty
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -51,16 +51,17 @@ class PoolSetup : FluidSimSetup() {
 
     override fun clone(): PoolSetup {
         val clone = PoolSetup()
-        copy(clone)
+        copyInto(clone)
         return clone
     }
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as PoolSetup
-        clone.poolDepth = poolDepth
-        clone.displacementHeight = displacementHeight
-        clone.displacementFractionX = displacementFractionX
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as PoolSetup
+        dst.poolDepth = poolDepth
+        dst.displacementHeight = displacementHeight
+        dst.displacementFractionX = displacementFractionX
+        dst.displacementFractionZ = displacementFractionZ
     }
 
     override val className: String = "Tsunamis/PoolSetup"

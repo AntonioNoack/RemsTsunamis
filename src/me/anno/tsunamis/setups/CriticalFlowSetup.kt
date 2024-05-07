@@ -77,17 +77,18 @@ class CriticalFlowSetup : FluidSimSetup() {
 
     override fun clone(): FluidSimSetup {
         val clone = CriticalFlowSetup()
-        copy(clone)
+        copyInto(clone)
         return clone
     }
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as CriticalFlowSetup
-        clone.shallowDepth = shallowDepth
-        clone.baseDepth = baseDepth
-        clone.bowWidth = bowWidth
-        clone.bowPower = bowPower
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as CriticalFlowSetup
+        dst.shallowDepth = shallowDepth
+        dst.baseDepth = baseDepth
+        dst.bowWidth = bowWidth
+        dst.bowPower = bowPower
+        dst.momentumX = momentumX
     }
 
     override val className: String = "Tsunamis/CriticalFlowSetup"

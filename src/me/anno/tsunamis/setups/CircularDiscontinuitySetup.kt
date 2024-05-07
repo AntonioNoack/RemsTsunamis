@@ -14,7 +14,7 @@ class CircularDiscontinuitySetup : FluidSimSetup {
     constructor()
 
     constructor(base: CircularDiscontinuitySetup) {
-        base.copy(this)
+        base.copyInto(this)
     }
 
     var heightInner = 8f
@@ -60,15 +60,15 @@ class CircularDiscontinuitySetup : FluidSimSetup {
 
     override fun clone() = CircularDiscontinuitySetup(this)
 
-    override fun copy(clone: PrefabSaveable) {
-        super.copy(clone)
-        clone as CircularDiscontinuitySetup
-        clone.heightInner = heightInner
-        clone.heightOuter = heightOuter
-        clone.impulseInner = impulseInner
-        clone.impulseOuter = impulseOuter
-        clone.radius = radius
-        clone.withAntialiasing = withAntialiasing
+    override fun copyInto(dst: PrefabSaveable) {
+        super.copyInto(dst)
+        dst as CircularDiscontinuitySetup
+        dst.heightInner = heightInner
+        dst.heightOuter = heightOuter
+        dst.impulseInner = impulseInner
+        dst.impulseOuter = impulseOuter
+        dst.radius = radius
+        dst.withAntialiasing = withAntialiasing
     }
 
     override val className: String = "Tsunamis/CircularDiscontinuitySetup"
