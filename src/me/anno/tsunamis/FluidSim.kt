@@ -989,13 +989,16 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                     val hu = engine.fluidMomentumX
                     val hv = engine.fluidMomentumY
                     val ba = engine.bathymetry
-                    for (coarseIndex in 0 until w * h) {
-                        val fineIndex = coarseIndexToFine(width, height, w, h, coarseIndex)
-                        val i4 = coarseIndex * 4
-                        newData[i4] = fh[fineIndex]
-                        newData[i4 + 1] = hu[fineIndex]
-                        newData[i4 + 2] = hv[fineIndex]
-                        newData[i4 + 3] = ba[fineIndex]
+                    var i4 = 0
+                    for (y in 0 until  h) {
+                        for (x in 0 until w) {
+                            val fineIndex = coarseIndexToFine2d(width, height, w, h, x,y)
+                            newData[i4] = fh[fineIndex]
+                            newData[i4 + 1] = hu[fineIndex]
+                            newData[i4 + 2] = hv[fineIndex]
+                            newData[i4 + 3] = ba[fineIndex]
+                            i4 = 4
+                        }
                     }
                     FloatImage(w, h, 4, newData)
                 } else {
@@ -1027,7 +1030,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
          * scales down a 1d index from a coarse grid to a fine grid, preserves the border;
          * w and cw include the ghost cells
          * */
-        fun coarseIndexToFine(x: Int, w: Int, cw: Int): Int {
+        fun coarseIndexToFine1d(x: Int, w: Int, cw: Int): Int {
             return when {
                 x < 2 -> x
                 cw - x <= 2 -> x + (w - cw)
@@ -1044,27 +1047,9 @@ class FluidSim : ProceduralMesh, CustomEditMode {
          * @param cw coarse width with ghost cells
          * @param ch coarse height with ghost cells
          * */
-        fun coarseIndexToFine(w: Int, h: Int, cw: Int, ch: Int, i: Int): Int {
-            return if (cw == w && ch == h) {
-                i
-            } else {
-                val x = i % cw
-                val y = i / cw
-                coarseIndexToFine(w, h, cw, ch, x, y)
-            }
-        }
-
-        /**
-         * scales down a 2d index from a coarse grid to a fine grid, preserves the border;
-         * w and cw include the ghost cells
-         * @param w width with ghost cells
-         * @param h height with ghost cells
-         * @param cw coarse width with ghost cells
-         * @param ch coarse height with ghost cells
-         * */
-        fun coarseIndexToFine(w: Int, h: Int, cw: Int, ch: Int, x: Int, y: Int): Int {
-            val nx = coarseIndexToFine(x, w, cw)
-            val ny = coarseIndexToFine(y, h, ch)
+        fun coarseIndexToFine2d(w: Int, h: Int, cw: Int, ch: Int, x: Int, y: Int): Int {
+            val nx = coarseIndexToFine1d(x, w, cw)
+            val ny = coarseIndexToFine1d(y, h, ch)
             return nx + ny * w
         }
 

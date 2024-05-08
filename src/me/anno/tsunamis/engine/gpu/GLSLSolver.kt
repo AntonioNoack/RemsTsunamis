@@ -1,6 +1,6 @@
 package me.anno.tsunamis.engine.gpu
 
-import me.anno.tsunamis.FluidSim
+import me.anno.tsunamis.FluidSim.Companion.coarseIndexToFine2d
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.TsunamiEngine
 
@@ -200,7 +200,7 @@ object GLSLSolver {
                         "${bathymetry.size})"
             )
         }
-        if(cw == w && ch == h){
+        if (cw == w && ch == h) {
             var j = 0
             for (y in 1 until ch - 1) {
                 var index = 1 + y * cw
@@ -215,14 +215,12 @@ object GLSLSolver {
         } else {
             var j = 0
             for (y in 1 until ch - 1) {
-                var coarseIndex = 1 + y * cw
                 for (x in 1 until cw - 1) {
-                    val fineIndex = FluidSim.coarseIndexToFine(w, h, cw, ch, coarseIndex)
+                    val fineIndex = coarseIndexToFine2d(w, h, cw, ch, x, y)
                     dst[j++] = fluidHeight[fineIndex]
                     dst[j++] = fluidMomentumX[fineIndex]
                     dst[j++] = fluidMomentumY[fineIndex]
                     dst[j++] = bathymetry[fineIndex]
-                    coarseIndex++
                 }
             }
         }

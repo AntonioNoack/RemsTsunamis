@@ -6,7 +6,7 @@ import me.anno.gpu.CullMode
 import me.anno.gpu.texture.Texture2D
 import me.anno.maths.Maths
 import me.anno.tsunamis.FluidSim
-import me.anno.tsunamis.FluidSim.Companion.coarseIndexToFine
+import me.anno.tsunamis.FluidSim.Companion.coarseIndexToFine2d
 import me.anno.tsunamis.FluidSim.Companion.f0
 import me.anno.tsunamis.FluidSimMod.Companion.linColorMap
 import me.anno.tsunamis.Visualisation
@@ -110,7 +110,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             culling == CullMode.BACK, // todo why is this not flipping the order?
             cellSize, mesh2,
             { xi, yi ->
-                val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                 bathymetry[i]
             },
             { x, y, dst ->
@@ -123,7 +123,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             },
             if (colorMap == null) TerrainUtils.ColorMap { _, _ -> -1 } else
                 TerrainUtils.ColorMap { xi, yi ->
-                    val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                    val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                     colorMap.getColor(bathymetry[i] * invCMScale)
                 }
         )
@@ -233,11 +233,11 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             val getColor: TerrainUtils.ColorMap = when (visualisation) {
                 Visualisation.HEIGHT_MAP -> {
                     if (colorMap == null) TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         getWaterColor(fluidHeight[i])
                     } else
                         TerrainUtils.ColorMap { xi, yi ->
-                            val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                            val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                             val fh = fluidHeight[i]
                             if (fh > 0f) {// underwater, surface color
                                 colorMap.getColor(-fh * invCMScale)
@@ -247,10 +247,10 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                 Visualisation.MOMENTUM_X -> {
                     val momentumScale = 1f / max(maxVisualizedValueInternally, 1e-38f)
                     if (colorMap == null) TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         getColor11(fluidMomentumX[i] * momentumScale)
                     } else TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         val fh = fluidHeight[i]
                         if (fh > 0f) {// underwater, surface color
                             getColor11(fluidMomentumX[i] * momentumScale)
@@ -260,10 +260,10 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                 Visualisation.MOMENTUM_Y -> {
                     val momentumScale = 1f / max(maxVisualizedValueInternally, 1e-38f)
                     if (colorMap == null) TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         getColor11(fluidMomentumY[i] * momentumScale)
                     } else TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         val fh = fluidHeight[i]
                         if (fh > 0f) {// underwater, surface color
                             getColor11(fluidMomentumY[i] * momentumScale)
@@ -273,10 +273,10 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                 Visualisation.MOMENTUM -> {
                     val momentumScale = 1f / max(maxVisualizedValueInternally, 1e-38f)
                     if (colorMap == null) TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         getColor11(Maths.length(fluidMomentumX[i], fluidMomentumY[i]) * momentumScale)
                     } else TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         val fh = fluidHeight[i]
                         if (fh > 0f) {// underwater, surface color
                             getColor11(Maths.length(fluidMomentumX[i], fluidMomentumY[i]) * momentumScale)
@@ -286,10 +286,10 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                 Visualisation.WATER_SURFACE -> {
                     val heightScale = 1f / max(maxVisualizedValueInternally, 1e-38f)
                     if (colorMap == null) TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         getColor11((fluidHeight[i] + bathymetry[i]) * heightScale)
                     } else TerrainUtils.ColorMap { xi, yi ->
-                        val i = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                        val i = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                         val fh = fluidHeight[i]
                         val ba = bathymetry[i]
                         if (fh > 0f) {// underwater, surface color
@@ -308,7 +308,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
             TerrainUtils.generateRegularQuadHeightMesh(
                 cw - 2, ch - 2, false, cellSize, mesh.getMesh(),
                 { xi, yi ->
-                    val index = coarseIndexToFine(w, h, cw, ch, xi, yi)
+                    val index = coarseIndexToFine2d(w, h, cw, ch, xi, yi)
                     val fh = fluidHeight[index]
                     val surface = fh + bathymetry[index]
                     if (fh > 0f) surface * fluidHeightScale else surface
@@ -380,7 +380,7 @@ abstract class TsunamiEngine(val width: Int, val height: Int) {
                 val ch = Maths.ceilDiv(height, coarsening)
                 for (y in 0 until ch) {
                     for (x in 0 until cw) {
-                        val i = coarseIndexToFine(width, height, cw, ch, x + y * cw)
+                        val i = coarseIndexToFine2d(width, height, cw, ch, x, y)
                         val f = fluid[i]
                         if (f > 0f) {
                             val s = f + bathymetry[i]

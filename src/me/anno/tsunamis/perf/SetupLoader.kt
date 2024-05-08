@@ -27,8 +27,7 @@ object SetupLoader {
     )
 
     operator fun YAMLNode?.get(key: String, default: String): String {
-        this ?: return default
-        val v = this[key] ?: return default
+        val v = this?.get(key) ?: return default
         return v.value ?: default
     }
 

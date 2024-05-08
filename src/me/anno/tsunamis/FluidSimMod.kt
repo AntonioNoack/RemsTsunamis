@@ -98,8 +98,6 @@ class FluidSimMod : Mod() {
         fun main(args: Array<String>) {
             ExtensionLoader.loadMainInfo()
             registerCustomClass(StringMap())
-            // print all shaders
-            // OpenGLShader.logShaders = true
             RemsEngine().run()
         }
     }
