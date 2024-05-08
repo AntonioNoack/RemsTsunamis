@@ -5,16 +5,15 @@ import me.anno.maths.Maths.clamp
 import me.anno.maths.Maths.mix
 import me.anno.tsunamis.FluidSimMod.Companion.linColorMap
 import me.anno.utils.Clock
+import org.apache.logging.log4j.LogManager
 import ucar.ma2.DataType
 import ucar.nc2.Variable
-import java.awt.image.BufferedImage
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
 class VariableImage(variable: Variable) : Image(
-    getWidth(variable),
-    getHeight(variable),
+    getWidth(variable), getHeight(variable),
     1, false
 ) {
 
@@ -51,6 +50,7 @@ class VariableImage(variable: Variable) : Image(
         c.stop("Min/Max")
 
         flipTextureY(width, height, floats)
+        c.stop("Flip Texture")
 
         this.min = min
         this.max = max
@@ -87,59 +87,65 @@ class VariableImage(variable: Variable) : Image(
 
     companion object {
 
-        fun getWidth(variable: Variable): Int {
+        private val LOGGER = LogManager.getLogger(VariableImage::class)
+
+        private fun getWidth(variable: Variable): Int {
             val shape = variable.shape
             return if (shape.isEmpty()) 1 else shape.last()
         }
 
-        fun getHeight(variable: Variable): Int {
+        private fun getHeight(variable: Variable): Int {
             val shape = variable.shape
             return if (shape.size < 2) 1 else shape[shape.size - 2]
         }
 
-        fun flipTextureY(width: Int, height: Int, data: FloatArray) {
+        private fun flipTextureY(width: Int, height: Int, values: FloatArray) {
             val hm1 = height - 1
+            val tmp = FloatArray(width)
             for (y in 0 until height / 2) {
-                var srcIndex = y * width
-                var dstIndex = (hm1 - y) * width
-                for (x in 0 until width) {
-                    val tmp = data[srcIndex]
-                    data[srcIndex] = data[dstIndex]
-                    data[dstIndex] = tmp
-                    srcIndex++
-                    dstIndex++
-                }
+                val srcIndex = y * width
+                val dstIndex = (hm1 - y) * width
+                values.copyInto(tmp, 0, srcIndex, srcIndex + width) // src -> tmp
+                values.copyInto(values, srcIndex, dstIndex, dstIndex + width) // dst -> src
+                tmp.copyInto(values, dstIndex) // tmp -> dst
             }
         }
 
-        fun clearNaNs(w: Int, h: Int, floats: FloatArray) {
-            val nanIndices = HashSet<Int>()
-            for (i in floats.indices) {
-                if (!floats[i].isFinite()) {
-                    nanIndices.add(i)
+        private fun findFiniteAverage(w: Int, h: Int, values: FloatArray, i: Int): Float {
+            val xc = i % w
+            val yc = i / w
+            var sum = 0f
+            var weight = 0
+            val x0 = max(xc - 2, 0)
+            val x1 = min(xc + 2, w - 1)
+            val y0 = max(yc - 2, 0)
+            val y1 = min(yc + 2, h - 1)
+            for (y in y0..y1) {
+                for (x in x0..x1) {
+                    val vi = values[i + (x - xc) + (y - yc) * w]
+                    if (vi.isFinite()) {
+                        sum += vi
+                        weight++
+                    }
                 }
             }
-            if (nanIndices.isNotEmpty()) {
-                // shuffle them, such that no value is propagated along the border for too long
-                for (i in nanIndices.shuffled()) {
-                    val x0 = i % w
-                    val y0 = i / w
-                    var sum = 0f
-                    var div = 0
-                    for (y in max(y0 - 2, 0) until min(y0 + 3, h)) {
-                        for (x in max(x0 - 2, 0) until min(x0 + 3, w)) {
-                            val vi = floats[i + (x - x0) + (y - y0) * w]
-                            if (vi.isFinite()) {
-                                sum += vi
-                                div++
-                            }
-                        }
-                    }
-                    if (div > 0) {
-                        sum /= div
-                    }
-                    floats[i] = sum
+            if (weight > 0) {
+                sum /= weight
+            }
+            return sum
+        }
+
+        private fun clearNaNs(w: Int, h: Int, values: FloatArray) {
+            val invalidIndices = HashSet<Int>()
+            for (i in values.indices) {
+                if (!values[i].isFinite()) {
+                    invalidIndices.add(i)
                 }
+            }
+            LOGGER.info("Found ${invalidIndices.size} invalid values")
+            // shuffle them, such that no value is propagated along the border for too long
+            for (i in invalidIndices.shuffled()) {
+                values[i] = findFiniteAverage(w, h, values, i)
             }
         }
     }

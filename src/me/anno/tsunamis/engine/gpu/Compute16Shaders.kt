@@ -1,6 +1,8 @@
 package me.anno.tsunamis.engine.gpu
 
 import me.anno.gpu.shader.ComputeShader
+import me.anno.gpu.shader.GLSLType
+import me.anno.gpu.shader.builder.Variable
 import org.joml.Vector2i
 import org.joml.Vector3i
 
@@ -9,17 +11,18 @@ class Compute16Shaders private constructor(bathymetryHalf: Boolean) {
     private val bty = if (bathymetryHalf) "r16f" else "r32f"
 
     val splitShader = ComputeShader(
-        "split16", Vector3i(16, 16, 1), listOf(), "" +
+        "split16", Vector3i(16, 16, 1), listOf(
+            Variable(GLSLType.V2I, "maxUV")
+        ), "" +
                 "precision highp float;\n" +
                 "layout(rgba32f, binding = 0) uniform image2D src;\n" +
                 "layout(r16f, binding = 1) uniform image2D dstSurface;\n" +
                 "layout(r16f, binding = 2) uniform image2D dstMomentumX;\n" +
                 "layout(r16f, binding = 3) uniform image2D dstMomentumY;\n" +
                 "layout($bty, binding = 4) uniform image2D dstBath;\n" +
-                "uniform ivec2 maxUV;\n" +
                 "void main(){\n" +
                 "   ivec2 uv = ivec2(gl_GlobalInvocationID.xy);\n" +
-                "   if(uv.x <= maxUV.x && uv.y <= maxUV.y){\n" +
+                "   if(all(lessThanEqual(uv, maxUV))){\n" +
                 "       vec4 data = imageLoad(src, uv);\n" +
                 "       imageStore(dstSurface,   uv, vec4(data.r + data.a));\n" +
                 "       imageStore(dstMomentumX, uv, vec4(data.y));\n" +
@@ -30,17 +33,18 @@ class Compute16Shaders private constructor(bathymetryHalf: Boolean) {
     )
 
     val mergeShader = ComputeShader(
-        "merge16", Vector3i(16, 16, 1), listOf(), "" +
+        "merge16", Vector3i(16, 16, 1), listOf(
+            Variable(GLSLType.V2I, "maxUV")
+        ), "" +
                 "precision highp float;\n" +
                 "layout(rgba32f, binding = 0) uniform image2D dst;\n" +
                 "layout(r16f, binding = 1) uniform image2D srcSurface;\n" +
                 "layout(r16f, binding = 2) uniform image2D srcMomentumX;\n" +
                 "layout(r16f, binding = 3) uniform image2D srcMomentumY;\n" +
                 "layout($bty, binding = 4) uniform image2D srcBath;\n" +
-                "uniform ivec2 maxUV;\n" +
                 "void main(){\n" +
                 "   ivec2 uv = ivec2(gl_GlobalInvocationID.xy);\n" +
-                "   if(uv.x <= maxUV.x && uv.y <= maxUV.y){\n" +
+                "   if(all(lessThanEqual(uv, maxUV))){\n" +
                 "       float dh   = imageLoad(srcSurface,   uv).x;\n" +
                 "       float mx   = imageLoad(srcMomentumX, uv).x;\n" +
                 "       float my   = imageLoad(srcMomentumY, uv).x;\n" +
@@ -53,17 +57,18 @@ class Compute16Shaders private constructor(bathymetryHalf: Boolean) {
     private fun createShader(x: Boolean): ComputeShader {
         return ComputeShader(
             if (x) "computeTimeStep16(x)" else "computeTimeStep16(y)",
-            Vector3i(16, 16, 1), listOf(), "" +
+            Vector3i(16, 16, 1), listOf(
+                Variable(GLSLType.V2I, "maxUV"),
+                Variable(GLSLType.V1F, "timeScale"),
+                Variable(GLSLType.V1F, "gravity"),
+                Variable(GLSLType.V1F, "minFluidHeight")
+            ), "" +
                     "precision highp float;\n" +
                     "layout(r16f, binding = 0) uniform image2D srcSurface;\n" +
                     "layout(r16f, binding = 1) uniform image2D srcMomentum;\n" +
                     "layout(r16f, binding = 2) uniform image2D dstSurface;\n" +
                     "layout(r16f, binding = 3) uniform image2D dstMomentum;\n" +
                     "layout($bty, binding = 4) uniform image2D srcBathymetry;\n" +
-                    "uniform ivec2 maxUV;\n" +
-                    "uniform float timeScale;\n" +
-                    "uniform float gravity;\n" +
-                    "uniform float minFluidHeight;\n" +
                     GLSLSolver.fWaveSolverHalf +
                     "vec3 load(ivec2 uv){\n" +
                     "   float surface  = imageLoad(srcSurface, uv).x;\n" +
@@ -73,7 +78,7 @@ class Compute16Shaders private constructor(bathymetryHalf: Boolean) {
                     "}\n" +
                     "void main(){\n" +
                     "   ivec2 uv = ivec2(gl_GlobalInvocationID.xy);\n" +
-                    "   if(uv.x <= maxUV.x && uv.y <= maxUV.y){\n" +
+                    "   if(all(lessThanEqual(uv, maxUV))){\n" +
                     "       ivec2 deltaUV = ivec2(${if (x) "1,0" else "0,1"});\n" +
                     "       vec3 data0 = load(max(uv - deltaUV, ivec2(0)));\n" + // left/top
                     "       vec3 data1 = load(uv);\n" +

@@ -3,7 +3,11 @@ package me.anno.tsunamis.engine.gpu
 import me.anno.gpu.GFX
 import me.anno.gpu.framebuffer.Framebuffer
 import me.anno.gpu.shader.GPUShader
-import me.anno.gpu.texture.*
+import me.anno.gpu.shader.Reduction
+import me.anno.gpu.texture.Clamping
+import me.anno.gpu.texture.Filtering
+import me.anno.gpu.texture.ITexture2D
+import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
 import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.gpu.GLSLSolver.createTextureData
@@ -57,10 +61,12 @@ abstract class GPUEngine<Buffer>(
 
     override fun updateStatistics(sim: FluidSim) {
         // leave them be
-        /*val reduced = Reduction.reduce(src, Reduction.MAX_RA)
-        sim.maxSurfaceHeight = reduced.x
-        sim.maxMomentumX = reduced.x
-        sim.maxMomentumY = reduced.y*/
+        if (src is ITexture2D) {
+            val reduced = Reduction.reduce(src, MAX_RA)
+            sim.maxSurfaceHeight = reduced.x
+            sim.maxMomentumX = reduced.y
+            sim.maxMomentumY = reduced.z
+        }
     }
 
     override fun computeMaxVelocity(gravity: Float, minFluidHeight: Float): Float {
@@ -74,7 +80,6 @@ abstract class GPUEngine<Buffer>(
     }
 
     companion object {
-
         fun initTextures(fb: Framebuffer) {
             fb.autoUpdateMipmaps = false
             fb.ensure()
@@ -95,6 +100,5 @@ abstract class GPUEngine<Buffer>(
             shader.v1f("minFluidHeight", minFluidHeight)
             shader.v2i("maxUV", src.width - 1, src.height - 1)
         }
-
     }
 }

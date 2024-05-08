@@ -7,6 +7,7 @@ import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.ShaderLib
+import me.anno.gpu.shader.ShaderLib.coordsList
 import me.anno.gpu.shader.ShaderLib.uvList
 import me.anno.gpu.shader.builder.Variable
 import me.anno.jvm.HiddenOpenGLContext
@@ -15,23 +16,20 @@ import me.anno.tsunamis.engine.CPUEngine
 import me.anno.tsunamis.engine.EngineType
 import me.anno.tsunamis.engine.TsunamiEngine.Companion.getMaxValue
 import me.anno.tsunamis.perf.SetupLoader
-import me.anno.tsunamis.perf.SetupLoader.getOrDefault
+import me.anno.tsunamis.perf.SetupLoader.get
 import me.anno.utils.OS.desktop
 import me.anno.utils.Sleep.waitUntil
 import me.anno.video.VideoCreator.Companion.renderVideo
 import org.apache.logging.log4j.LogManager
-import org.joml.Vector4f
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 object VideoRenderer {
 
-    // loggers are used to identify where log messages are coming from,
-    // and to filter, if needed
     private val LOGGER = LogManager.getLogger(VideoRenderer::class)
 
     private val showWavesShader = ShaderLib.createShader(
-        "copy", listOf(), ShaderLib.coordsUVVertexShader, uvList, listOf(
+        "showWaves", coordsList, ShaderLib.coordsUVVertexShader, uvList, listOf(
             Variable(GLSLType.S2D, "tex"),
             Variable(GLSLType.V3F, "scale")
         ), "" +
@@ -45,9 +43,6 @@ object VideoRenderer {
                 "}", listOf("tex")
     )
 
-    // when a main function is inside an object or class,
-    // @JvmStatic and Array<String> need to be added to the function
-    // for it to be registered as an executable main function within Intellij Idea
     @JvmStatic
     fun main(args: Array<String>) {
 
@@ -62,30 +57,31 @@ object VideoRenderer {
 
         val w = fullSetup.width
         val h = fullSetup.height
-        val numFrames = config.getOrDefault("numFrames", 500)
-        val numStepsPerFrame = config.getOrDefault("stepsPerFrame", 10)
+        val numFrames = config["numFrames", 500]
+        val numStepsPerFrame = config["stepsPerFrame", 10]
 
-        val outputScale = config.getOrDefault("outputScale", min(1f, 1024f / w))
+        val outputScale = config["outputScale", min(1f, 1024f / w)]
 
         val outputWidth = (w * outputScale).roundToInt()
             .and(1.inv()) // round size, and make even (because some codecs only support even side lengths)
         val outputHeight = (h * outputScale).roundToInt()
             .and(1.inv())
 
-        val engineType = when (config.getOrDefault("engineType", "").lowercase()) {
+        val engineType = when (config["engineType", "gfx"].lowercase()) {
             "compute" -> EngineType.GPU_COMPUTE
             "fp16-b16" -> EngineType.GPU_COMPUTE_FP16B16
             "fp16-b32" -> EngineType.GPU_COMPUTE_FP16B32
             "shared-memory" -> EngineType.GPU_SHARED_MEMORY
             "two-passes" -> EngineType.GPU_2PASSES
             "yx" -> EngineType.GPU_COMPUTE_YX
+            "cpu" -> EngineType.CPU
             else -> EngineType.GPU_GRAPHICS
         }
 
         LOGGER.info("Output Size: $outputWidth x $outputHeight, engine type: $engineType")
 
-        if (config.getOrDefault("egl", false)) {
-            val useDefaultDisplay = config.getOrDefault("eglUseDefaultDisplay", false)
+        if (config["egl", false]) {
+            val useDefaultDisplay = config["eglUseDefaultDisplay", false]
             // this size parameter shouldn't matter
             // it's the size of the default framebuffer
             EGLContext.createContext(512, 512, useDefaultDisplay)
@@ -97,7 +93,7 @@ object VideoRenderer {
 
         val engine = EngineType.create(engineType, w, h) as CPUEngine
 
-        val maxMomentum = config.getOrDefault("maxMomentum", 100f)
+        val maxMomentum = config["maxMomentum", 100f]
 
         waitUntil(true) { setup.isReady() }
         engine.init(null, setup, gravity, minFluidHeight)
@@ -105,16 +101,13 @@ object VideoRenderer {
         LOGGER.info("Preferred size: ${setup.getPreferredNumCellsX()} x ${setup.getPreferredNumCellsY()}")
 
         val scaling = cflFactor / engine.computeMaxVelocity(gravity, minFluidHeight)
-
         val maxFluidHeight = getMaxValue(w, h, 1, engine.fluidHeight, engine.bathymetry)
 
-        val maxValues = Vector4f()
         val srcFB = Framebuffer("src", outputWidth, outputHeight, 1, 1, true, DepthBufferType.NONE)
         renderVideo(outputWidth, outputHeight, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB, { _, callback ->
             for (i in 0 until numStepsPerFrame) {
                 engine.step(gravity, scaling, minFluidHeight)
             }
-            // maxValues.max(Reduction.reduce(engine.src, Reduction.MAX_RA))
             useFrame(srcFB) {
                 val shader = showWavesShader.value
                 shader.use()
@@ -124,11 +117,6 @@ object VideoRenderer {
             }
             callback()
         })
-
-        LOGGER.info("Maximum values: $maxValues")
-
         Engine.requestShutdown()
-
     }
-
 }

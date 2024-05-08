@@ -6,10 +6,16 @@ import me.anno.gpu.GFXState.useFrame
 import me.anno.gpu.buffer.SimpleBuffer
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
-import me.anno.gpu.shader.GPUShader.Companion.attribute
+import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.Shader
+import me.anno.gpu.shader.ShaderLib.coordsList
+import me.anno.gpu.shader.ShaderLib.coordsVertexShader
+import me.anno.gpu.shader.builder.Variable
 import me.anno.gpu.shader.renderer.Renderer.Companion.copyRenderer
-import me.anno.gpu.texture.*
+import me.anno.gpu.texture.Clamping
+import me.anno.gpu.texture.Filtering
+import me.anno.gpu.texture.ITexture2D
+import me.anno.gpu.texture.Texture2D
 import me.anno.tsunamis.FluidSim
 import org.lwjgl.opengl.GL11
 
@@ -85,18 +91,16 @@ class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, he
             val p = if (x) "xyw" else "xzw"
             val shader = Shader(
                 if (x) "gfxTimeStep(x)" else "gfxTimeStep(y)",
-                "" +
-                        "$attribute vec2 attr0;\n" +
-                        "void main(){ gl_Position = vec4(attr0*2.0-1.0,0.5,1.0); }",
-                emptyList(), "" +
+                coordsList, coordsVertexShader,
+                emptyList(), listOf(
+                    Variable(GLSLType.V2I, "maxUV"),
+                    Variable(GLSLType.V1F, "timeScale"),
+                    Variable(GLSLType.V1F, "gravity"),
+                    Variable(GLSLType.V1F, "minFluidHeight"),
+                    Variable(GLSLType.S2D, "state0")
+                ), "" +
                         "precision highp float;\n" +
-                        "uniform sampler2D state0;\n" +
-                        "uniform ivec2 maxUV;\n" +
-                        "uniform float timeScale;\n" +
-                        "uniform float gravity;\n" +
-                        "uniform float minFluidHeight;\n" +
                         GLSLSolver.fWaveSolverHalf +
-                        // "(layout = 0) out vec4 gl_FragColor;\n" +
                         "void main(){\n" +
                         "   int lod = 0;\n" +
                         "   ivec2 uv = ivec2(gl_FragCoord.xy);\n" +

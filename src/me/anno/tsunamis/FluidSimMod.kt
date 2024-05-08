@@ -89,14 +89,6 @@ class FluidSimMod : Mod() {
 
     }
 
-    override fun onExit() {
-        super.onExit()
-        for (s in netCDFSignatures)
-            Signature.unregister(s)
-        for (s in colorMapSignatures)
-            Signature.unregister(s)
-    }
-
     companion object {
 
         val linColorMap = LinearColorMap(0x0055ff or black, -1, 0xff0000 or black)

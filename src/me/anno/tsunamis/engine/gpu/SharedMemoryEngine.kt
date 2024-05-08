@@ -4,9 +4,10 @@ import me.anno.gpu.GFX
 import me.anno.gpu.GFXState.renderPurely
 import me.anno.gpu.shader.ComputeShader
 import me.anno.gpu.shader.ComputeTextureMode
+import me.anno.gpu.shader.GLSLType
+import me.anno.gpu.shader.builder.Variable
 import me.anno.gpu.texture.Texture2D
 import me.anno.maths.Maths.ceilDiv
-import org.joml.Vector2i
 import org.joml.Vector3i
 
 class SharedMemoryEngine(width: Int, height: Int) :
@@ -39,14 +40,15 @@ class SharedMemoryEngine(width: Int, height: Int) :
             val p = if (x) "xyw" else "xzw"
             return ComputeShader(
                 if (x) "computeTimeStep(x)" else "computeTimeStep(y)",
-                Vector3i(updateSize, updateSize, 1), listOf(), "" +
+                Vector3i(updateSize, updateSize, 1), listOf(
+                    Variable(GLSLType.V2I, "maxUV"),
+                    Variable(GLSLType.V1F, "timeScale"),
+                    Variable(GLSLType.V1F, "gravity"),
+                    Variable(GLSLType.V1F, "minFluidHeight")
+                ), "" +
                         "precision highp float;\n" +
                         "layout(rgba32f, binding = 0) uniform image2D src;\n" +
                         "layout(rgba32f, binding = 1) uniform image2D dst;\n" +
-                        "uniform ivec2 maxUV;\n" +
-                        "uniform float timeScale;\n" +
-                        "uniform float gravity;\n" +
-                        "uniform float minFluidHeight;\n" +
                         GLSLSolver.fWaveSolverFull +
                         "shared vec4 updates[$updateSize * $updateSize];\n" +
                         "void main(){\n" +

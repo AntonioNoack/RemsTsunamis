@@ -7,7 +7,7 @@ import me.anno.io.files.Reference.getReference
 import me.anno.jvm.HiddenOpenGLContext
 import me.anno.tsunamis.egl.EGLContext
 import me.anno.tsunamis.engine.EngineType
-import me.anno.tsunamis.perf.SetupLoader.getOrDefault
+import me.anno.tsunamis.perf.SetupLoader.get
 import me.anno.utils.Sleep.waitUntil
 import me.anno.utils.types.Floats.f2
 import me.anno.utils.types.Floats.f3
@@ -144,10 +144,10 @@ fun main(args: Array<String>) {
     val height = loaded.height
     val config = loaded.config
 
-    val testCPU = config.getOrDefault("testCPU", true)
-    val testGPU = config.getOrDefault("testGPU", true)
+    val testCPU = config["testCPU", true]
+    val testGPU = config["testGPU", true]
 
-    val compareXY = config.getOrDefault("compareXY", true)
+    val compareXY = config["compareXY", true]
 
     if (!testCPU && !testGPU) {
         logger.warn("Neither CPU not GPU were tested")
@@ -155,8 +155,8 @@ fun main(args: Array<String>) {
     }
 
     if (testGPU) {
-        if (config.getOrDefault("egl", false)) {
-            val useDefaultDisplay = config.getOrDefault("eglUseDefaultDisplay", false)
+        if (config["egl", false]) {
+            val useDefaultDisplay = config["eglUseDefaultDisplay", false]
             // this size parameter shouldn't matter
             // it's the size of the default framebuffer
             EGLContext.createContext(512, 512, useDefaultDisplay)
@@ -165,8 +165,8 @@ fun main(args: Array<String>) {
         }
     }
 
-    val warmupIterations = loaded.config.getOrDefault("warmupIterations", 2)
-    val testDurationSeconds = loaded.config.getOrDefault("testDurationSeconds", 10.0)
+    val warmupIterations = loaded.config["warmupIterations", 2]
+    val testDurationSeconds = loaded.config["testDurationSeconds", 10.0]
     val cflFactor = loaded.cflFactor
     val gravity = loaded.gravity
     val minFluidHeight = loaded.minFluidHeight
@@ -280,7 +280,7 @@ fun main(args: Array<String>) {
 
     }
 
-    if (testGPU && config.getOrDefault("egl", false)) {
+    if (testGPU && config["egl", false]) {
         EGLContext.destroyContext()
     }
 

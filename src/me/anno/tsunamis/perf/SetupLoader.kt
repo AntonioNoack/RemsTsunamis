@@ -26,39 +26,34 @@ object SetupLoader {
         val config: YAMLNode?
     )
 
-    fun YAMLNode?.getOrDefault(key: String, default: String): String {
+    operator fun YAMLNode?.get(key: String, default: String): String {
         this ?: return default
         val v = this[key] ?: return default
         return v.value ?: default
     }
 
-    fun YAMLNode?.getOrDefault(key: String, default: FileReference): FileReference {
-        this ?: return default
-        val v = this[key]?.value ?: return default
+    operator fun YAMLNode?.get(key: String, default: FileReference): FileReference {
+        val v = this?.get(key)?.value ?: return default
         return getReference(v)
     }
 
-    fun YAMLNode?.getOrDefault(key: String, default: Float): Float {
-        this ?: return default
-        val v = this[key]?.value ?: return default
+    operator fun YAMLNode?.get(key: String, default: Float): Float {
+        val v = this?.get(key)?.value ?: return default
         return v.toFloatOrNull() ?: default
     }
 
-    fun YAMLNode?.getOrDefault(key: String, default: Double): Double {
-        this ?: return default
-        val v = this[key]?.value ?: return default
+    operator fun YAMLNode?.get(key: String, default: Double): Double {
+        val v = this?.get(key)?.value ?: return default
         return v.toDoubleOrNull() ?: default
     }
 
-    fun YAMLNode?.getOrDefault(key: String, default: Int): Int {
-        this ?: return default
-        val v = this[key]?.value ?: return default
+    operator fun YAMLNode?.get(key: String, default: Int): Int {
+        val v = this?.get(key)?.value ?: return default
         return v.toIntOrNull() ?: default
     }
 
-    fun YAMLNode?.getOrDefault(key: String, default: Boolean): Boolean {
-        this ?: return default
-        val v = this[key]?.value ?: return default
+    operator fun YAMLNode?.get(key: String, default: Boolean): Boolean {
+        val v = this?.get(key)?.value ?: return default
         return when (v.lowercase()) {
             "true", "t", "1", "yes", "y" -> true
             else -> false
@@ -112,49 +107,49 @@ object SetupLoader {
 
 
             // + 2 for ghost cells
-            width = max(1, config.getOrDefault("nx", width)) + 2
-            height = max(1, config.getOrDefault("ny", height)) + 2
+            width = max(1, config["nx", width]) + 2
+            height = max(1, config["ny", height]) + 2
 
-            gravity = config.getOrDefault("gravity", gravity)
-            cfl = config.getOrDefault("cflFactor", cfl)
+            gravity = config["gravity", gravity]
+            cfl = config["cflFactor", cfl]
 
-            minFluidHeight = config.getOrDefault("minFluidHeight", minFluidHeight)
+            minFluidHeight = config["minFluidHeight", minFluidHeight]
 
-            scale = config.getOrDefault("scale", 1f)
+            scale = config["scale", 1f]
 
             when (val type = config["setup"]?.value) {
                 "DamBreak1d", "DamBreak" -> {
                     setup = LinearDiscontinuitySetup()
-                    setup.heightLeft = config.getOrDefault("hl", setup.heightLeft)
-                    setup.heightRight = config.getOrDefault("hr", setup.heightRight)
-                    setup.impulseLeft = config.getOrDefault("hul", setup.impulseLeft)
-                    setup.impulseRight = config.getOrDefault("hur", setup.impulseRight)
-                    setup.bathymetryLeft = config.getOrDefault("bl", setup.bathymetryLeft)
-                    setup.bathymetryRight = config.getOrDefault("br", setup.bathymetryRight)
+                    setup.heightLeft = config["hl", setup.heightLeft]
+                    setup.heightRight = config["hr", setup.heightRight]
+                    setup.impulseLeft = config["hul", setup.impulseLeft]
+                    setup.impulseRight = config["hur", setup.impulseRight]
+                    setup.bathymetryLeft = config["bl", setup.bathymetryLeft]
+                    setup.bathymetryRight = config["br", setup.bathymetryRight]
                 }
                 "DamBreak2d", "DamBreakCircle" -> {
                     // l_heightLeft, l_heightRight, l_splitPositionX, l_splitPositionY, l_damRadius, l_damBathymetry
                     setup = CircularDiscontinuitySetup()
-                    setup.heightInner = config.getOrDefault("hl", setup.heightInner)
-                    setup.heightOuter = config.getOrDefault("hr", setup.heightOuter)
-                    setup.impulseInner = config.getOrDefault("hul", setup.impulseInner)
-                    setup.impulseOuter = config.getOrDefault("hur", setup.impulseOuter)
+                    setup.heightInner = config["hl", setup.heightInner]
+                    setup.heightOuter = config["hr", setup.heightOuter]
+                    setup.impulseInner = config["hul", setup.impulseInner]
+                    setup.impulseOuter = config["hur", setup.impulseOuter]
                     // was originally absolute, now is relative
-                    setup.radius = config.getOrDefault("damRadius", setup.radius * width) / width
+                    setup.radius = config["damRadius", setup.radius * width] / width
                 }
                 "Tsunami2d", "NetCDF", "NetCDFSetup" -> {
                     setup as NetCDFSetup
-                    setup.bathymetryFile = config.getOrDefault("bathymetryFile", setup.bathymetryFile)
-                    setup.displacementFile = config.getOrDefault("displacementFile", setup.displacementFile)
+                    setup.bathymetryFile = config["bathymetryFile", setup.bathymetryFile]
+                    setup.displacementFile = config["displacementFile", setup.displacementFile]
                 }
                 "ArtificialTsunami2d", "PoolSetup" -> {
                     setup = PoolSetup()
-                    setup.poolDepth = config.getOrDefault("poolDepth", setup.poolDepth)
-                    setup.displacementHeight = config.getOrDefault("displacementHeight", setup.displacementHeight)
+                    setup.poolDepth = config["poolDepth", setup.poolDepth]
+                    setup.displacementHeight = config["displacementHeight", setup.displacementHeight]
                     setup.displacementFractionX =
-                        config.getOrDefault("displacementFractionX", setup.displacementFractionX)
+                        config["displacementFractionX", setup.displacementFractionX]
                     setup.displacementFractionZ =
-                        config.getOrDefault("displacementFractionY", setup.displacementFractionZ)
+                        config["displacementFractionY", setup.displacementFractionZ]
                 }
                 "GMTTrack", "Tsunami" -> {
                     /* file format: csv
@@ -164,7 +159,7 @@ object SetupLoader {
                     141.030591782,37.316687053,500.000650342,-7.13790480308
                     141.033413179,37.316745979,750.000973849,-7.5143793363
                     */
-                    val setupFile = config.getOrDefault("setupFile", InvalidRef)
+                    val setupFile = config["setupFile", InvalidRef]
                     if (setupFile == InvalidRef) throw RuntimeException("Missing parameter setupFile for GMT track data")
                     if (!setupFile.exists) throw RuntimeException("Could not find $setupFile")
                     if (setupFile.isDirectory) throw RuntimeException("Setup file must be a file, not a directory")
@@ -176,27 +171,27 @@ object SetupLoader {
                 }
                 "Critical" -> {
                     setup = CriticalFlowSetup()
-                    setup.shallowDepth = config.getOrDefault("shallowDepth", setup.shallowDepth)
-                    setup.baseDepth = config.getOrDefault("baseDepth", setup.baseDepth)
-                    setup.momentumX = config.getOrDefault("momentumX", setup.momentumX)
-                    setup.bowWidth = config.getOrDefault("bowWidth", setup.bowWidth)
-                    setup.bowPower = config.getOrDefault("bowPower", setup.bowPower)
+                    setup.shallowDepth = config["shallowDepth", setup.shallowDepth]
+                    setup.baseDepth = config["baseDepth", setup.baseDepth]
+                    setup.momentumX = config["momentumX", setup.momentumX]
+                    setup.bowWidth = config["bowWidth", setup.bowWidth]
+                    setup.bowPower = config["bowPower", setup.bowPower]
                 }
                 "Subcritical", "SubcriticalFlow", "SubcriticalFlow1d" -> {
                     setup = CriticalFlowSetup()
-                    setup.shallowDepth = config.getOrDefault("shallowDepth", 1.8f)
-                    setup.baseDepth = config.getOrDefault("baseDepth", 2f)
-                    setup.momentumX = config.getOrDefault("momentumX", 4.42f)
-                    setup.bowWidth = config.getOrDefault("bowWidth", 0.2f)
-                    setup.bowPower = config.getOrDefault("bowPower", 2f)
+                    setup.shallowDepth = config["shallowDepth", 1.8f]
+                    setup.baseDepth = config["baseDepth", 2f]
+                    setup.momentumX = config["momentumX", 4.42f]
+                    setup.bowWidth = config["bowWidth", 0.2f]
+                    setup.bowPower = config["bowPower", 2f]
                 }
                 "Supercritical", "SupercriticalFlow", "SupercriticalFlow1d" -> {
                     setup = CriticalFlowSetup()
-                    setup.shallowDepth = config.getOrDefault("shallowDepth", 0.13f)
-                    setup.baseDepth = config.getOrDefault("baseDepth", 0.33f)
-                    setup.momentumX = config.getOrDefault("momentumX", 0.18f)
-                    setup.bowWidth = config.getOrDefault("bowWidth", 0.2f)
-                    setup.bowPower = config.getOrDefault("bowPower", 2f)
+                    setup.shallowDepth = config["shallowDepth", 0.13f]
+                    setup.baseDepth = config["baseDepth", 0.33f]
+                    setup.momentumX = config["momentumX", 0.18f]
+                    setup.bowWidth = config["bowWidth", 0.2f]
+                    setup.bowPower = config["bowPower", 2f]
                 }
                 // a checkpoint could be used as well...
                 null -> { /* fine, use default */
@@ -204,8 +199,8 @@ object SetupLoader {
                 else -> throw RuntimeException("Invalid setup type $type")
             }
 
-            setup.hasBorder = config.getOrDefault("hasBorder", setup !is NetCDFSetup)
-            setup.borderHeight = config.getOrDefault("borderHeight", setup.borderHeight)
+            setup.hasBorder = config["hasBorder", setup !is NetCDFSetup]
+            setup.borderHeight = config["borderHeight", setup.borderHeight]
 
         } catch (e: IOException) {
             LOGGER.warn("Config was not found", e)

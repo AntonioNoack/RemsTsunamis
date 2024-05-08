@@ -10,14 +10,6 @@ class FloatBufferImage(width: Int, height: Int, channels: Int, val data: FloatBu
         return data[index * numChannels + channel]
     }
 
-    override fun normalize(): IFloatImage {
-        TODO("Not yet implemented")
-    }
-
-    override fun reinhard(): IFloatImage {
-        TODO("Not yet implemented")
-    }
-
     override fun setValue(index: Int, channel: Int, value: Float): Float {
         val idx = index * numChannels + channel
         val prev = data[idx]

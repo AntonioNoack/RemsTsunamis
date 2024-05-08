@@ -8,10 +8,10 @@ import me.anno.ecs.components.mesh.material.Material
 import me.anno.ecs.components.mesh.material.MaterialCache
 import me.anno.ecs.components.mesh.material.utils.TypeValue
 import me.anno.ecs.interfaces.CustomEditMode
-import me.anno.ecs.prefab.Prefab
 import me.anno.ecs.prefab.PrefabSaveable
 import me.anno.engine.raycast.RayQuery
 import me.anno.engine.raycast.Raycast
+import me.anno.engine.raycast.RaycastMesh
 import me.anno.engine.serialization.NotSerializedProperty
 import me.anno.engine.serialization.SerializedProperty
 import me.anno.engine.ui.render.RenderState
@@ -28,7 +28,6 @@ import me.anno.image.raw.IFloatImage
 import me.anno.input.Input
 import me.anno.io.files.FileReference
 import me.anno.io.files.Reference.getReference
-import me.anno.io.files.inner.temporary.InnerTmpPrefabFile
 import me.anno.language.translation.NameDesc
 import me.anno.maths.Maths.ceilDiv
 import me.anno.maths.Maths.clamp
@@ -630,24 +629,53 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         val targetSize = (cw - 1) * (ch - 1) * 2
         if (mesh2.proceduralLength != targetSize) {
             mesh2.proceduralLength = targetSize
-            // set the bounding box positions, so it is clickable
-            val x = width * 0.5f * cellSizeMeters
-            val z = height * 0.5f * cellSizeMeters
-            mesh2.positions = floatArrayOf(
-                -x, 0f, -z,
-                -x, 0f, +z,
-                +x, 0f, -z,
-                +x, 0f, +z,
-            )
-            mesh2.indices = intArrayOf(
-                0, 1, 2, 2, 3, 0,
-                0, 2, 1, 2, 0, 2
-            )
+            mesh2.positions = null
+            mesh2.indices = null
             mesh2.normals = null
             mesh2.color0 = null
-            invalidateMesh()
+            mesh2.invalidateGeometry()
         }
-        // todo it would be cool if we had a rough mesh on the cpu, and a fine one on the gpu
+
+        // set the bounding box positions, so it is clickable
+        val mesh3 = collisionMesh
+        val x = width * 0.5f * cellSizeMeters
+        val z = height * 0.5f * cellSizeMeters
+        mesh3.positions = floatArrayOf(
+            -x, 0f, -z,
+            -x, 0f, +z,
+            +x, 0f, -z,
+            +x, 0f, +z,
+        )
+        mesh3.indices = intArrayOf(
+            0, 1, 2, 2, 3, 0,
+            0, 2, 1, 2, 0, 2
+        )
+    }
+
+    private val collisionMesh = Mesh()
+    override fun raycastAnyHit(query: RayQuery): Boolean {
+        val mesh = collisionMesh
+        return if (RaycastMesh.raycastGlobalMeshAnyHit(query, transform, mesh)) {
+            query.result.mesh = mesh
+            true
+        } else false
+    }
+
+    override fun raycastClosestHit(query: RayQuery): Boolean {
+        val mesh = collisionMesh
+        return if (RaycastMesh.raycastGlobalMeshClosestHit(query, transform, mesh)) {
+            query.result.mesh = mesh
+            true
+        } else false
+    }
+
+    override fun fillSpace(globalTransform: Matrix4x3d, aabb: AABBd): Boolean {
+        val dx = width * 0.5 * cellSizeMeters
+        val dz = height * 0.5 * cellSizeMeters
+        localAABB.setMin(-dx, 0.0, -dz).setMax(+dx, 0.0, +dz)
+        localAABB.transform(globalTransform, globalAABB)
+        aabb.union(globalAABB)
+        return true
     }
 
     private fun generateFluidMesh(mesh: ProceduralMesh) {
@@ -936,12 +964,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
     }
 
     override val className: String = "Tsunamis/FluidSim"
-
-    @NotSerializedProperty
-    val fluidMaterialList16 by lazy { createMaterials(true) }
-
-    @NotSerializedProperty
-    val fluidMaterialList32 by lazy { createMaterials(false) }
     // val solidMaterialList by lazy { createMaterials() }
 
     fun isApprox(a: Int, b: Int, threshold: Float = 1.05f): Boolean {
@@ -1046,15 +1068,14 @@ class FluidSim : ProceduralMesh, CustomEditMode {
             return nx + ny * w
         }
 
+        val fluidMaterialList16 = createMaterials(true)
+        val fluidMaterialList32 = createMaterials(false)
+
         private fun createMaterials(halfPrecision: Boolean): List<FileReference> {
-            val prefab = Prefab("Material")
-            prefab.createInstance() // ensure there is an instance
-            prefab.setProperty(
-                "shader",
-                if (halfPrecision) YTextureShader.r16fShader
-                else YTextureShader.rgbaShader
-            )
-            return listOf(InnerTmpPrefabFile(prefab))
+            val material = Material()
+            material.shader = if (halfPrecision) YTextureShader.r16fShader
+            else YTextureShader.rgbaShader
+            return listOf(material.ref)
         }
 
         val threadPool = ProcessingGroup("TsunamiSim", 1f)

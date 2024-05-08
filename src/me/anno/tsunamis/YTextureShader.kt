@@ -1,8 +1,11 @@
 package me.anno.tsunamis
 
 import me.anno.engine.ui.render.ECSMeshShader
+import me.anno.engine.ui.render.RendererLib.getReflectivity
 import me.anno.gpu.shader.GLSLType
-import me.anno.gpu.shader.ShaderLib
+import me.anno.gpu.shader.ShaderLib.brightness
+import me.anno.gpu.shader.ShaderLib.parallaxMapping
+import me.anno.gpu.shader.ShaderLib.quatRot
 import me.anno.gpu.shader.builder.Function
 import me.anno.gpu.shader.builder.ShaderStage
 import me.anno.gpu.shader.builder.Variable
@@ -11,7 +14,7 @@ import me.anno.utils.types.Booleans.hasFlag
 
 class YTextureShader private constructor(private val halfPrecision: Boolean) : ECSMeshShader("YTexture") {
 
-    fun createVertexVariables(): ArrayList<Variable> {
+    private fun createVertexVariables(): ArrayList<Variable> {
         val list = ArrayList<Variable>()
         list.add(Variable(GLSLType.M4x3, "localTransform"))
         if (halfPrecision) {
@@ -33,11 +36,9 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
         list.add(Variable(GLSLType.V4F, "heightMask"))
         list.add(Variable(GLSLType.V1F, "fluidHeightScale"))
         list.add(Variable(GLSLType.V2I, "coarseSize"))
-        list.add(Variable(GLSLType.V1B, "nearestNeighborColors", VariableMode.IN))
+        list.add(Variable(GLSLType.V1B, "nearestNeighborColors"))
         return list
     }
-
-    // todo this is broken!!! terrain or fluid surface are drawn 100s of times over each other, which is wrong, and ruins performance
 
     private val getColorFunc = Function(
         "", "color-func",
@@ -88,25 +89,20 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
     )
 
     override fun createVertexStages(key: ShaderKey): List<ShaderStage> {
-
-        val isInstanced = key.flags.hasFlag(IS_INSTANCED)
-        val colors = key.flags.hasFlag(NEEDS_COLORS)
-
-        val defines = "" +
-                (if (isInstanced) "#define INSTANCED\n" else "") +
-                (if (colors) "#define COLORS\n" else "")
-
-        glslVersion = 330
-
-       // val original = super.createVertexStages(key)
-
-        // done coarsening on gpu side: scale down image, or just use it as-is with strided access?
-        // (to do maybe) scaling down the image should help performance, when not every frame is rendered, or shadows are needed
-
-        return emptyList<ShaderStage>() + ShaderStage(
-            "vertex", createVertexVariables(),
+        return super.createDefines(key) + ShaderStage(
+            "vertex", createVertexVariables() + listOf(
+                Variable(GLSLType.V3F, "localPosition", VariableMode.OUT),
+                Variable(GLSLType.V3F, "finalPosition", VariableMode.OUT),
+                Variable(GLSLType.V4F, "currPosition", VariableMode.OUT),
+                Variable(GLSLType.V4F, "prevPosition", VariableMode.OUT),
+                Variable(GLSLType.V3F, "normal", VariableMode.OUT),
+                Variable(GLSLType.V4F, "tangent", VariableMode.OUT),
+                Variable(GLSLType.V4F, "vertexColor0", VariableMode.OUT),
+                Variable(GLSLType.M4x3, "localTransform"),
+                Variable(GLSLType.M4x4, "prevTransform"),
+                Variable(GLSLType.M4x4, "transform"),
+            ),
             "" +
-                    defines +
                     // create x,z coordinates from vertex index
                     // create y,normal from texture data
                     "int lod = 0;\n" +
@@ -117,7 +113,7 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "ivec2 fieldSize = textureSize(${if (halfPrecision) "fluidSurface" else "fluidData"}, lod);\n" +
                     "int instanceId = int(gl_InstanceID);\n" +
                     "int cellIndex  = instanceId >> 1;\n" +
-                    "int partOfCell = gl_VertexID + (instanceId & 1) * 3;\n" +
+                    "int partOfCell = clamp(gl_VertexID + (instanceId & 1) * 3, 0, 5);\n" +
                     "int deltaX[6] = int[](0, 1, 1, 1, 0, 0);\n" +
                     "int deltaY[6] = int[](0, 1, 0, 1, 0, 1);\n" +
                     "int numCellsX = max(1, coarseSize.x - 1);\n" +
@@ -133,10 +129,11 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "   cellYi = COARSE_INDEX_TO_FINE1(cellYi, fieldSize.y, coarseSize.y);\n" +
                     "}\n" +
                     "ivec2 cell = ivec2(cellXi, cellYi);\n" +
-                    "vec2 invFieldSize = 1.0 / vec2(fieldSize-1);\n" +
+                    "vec2 invFieldSize = 1.0 / vec2(fieldSizeM1);\n" +
                     "vec2 uv = vec2(cellXi, cellYi) * invFieldSize;\n" + // [0,1]
                     "vec4 data = getFluidData(cell, fieldSizeM1);\n" +
                     "localPosition = vec3(float(cellXi) * cellSize, SURFACE2(data), float(cellYi) * cellSize) + cellOffset;\n" +
+                    "prevPosition = vec4(localPosition,1.0);\n" +
                     "#ifdef COLORS\n" +
                     // calculate the normals
                     "   vec4 dxp = getFluidData(cell + ivec2(1, 0), fieldSizeM1);\n" +
@@ -150,121 +147,60 @@ class YTextureShader private constructor(private val halfPrecision: Boolean) : E
                     "   ));\n" +
                     // should be done more properly, but it's only used for effects we don't need, so it doesn't really matter
                     "   vec4 tangents = vec4(1.0, 0.0, 0.0, 0.0);\n" +
-                    "#endif\n" +
-                    // instanced is not supported
-                    "finalPosition = localTransform * vec4(localPosition, 1.0);\n" +
-                    "#ifdef COLORS\n" +
-                    "   normal  = normalize(localTransform * vec4(normals, 0.0));\n" +
-                    "   tangent.xyz = normalize(localTransform * vec4(tangents.xyz, 0.0));\n" +
+                    "   normal = normalize(matMul(localTransform, vec4(normals, 0.0)));\n" +
+                    "   tangent.xyz = normalize(matMul(localTransform, vec4(tangents.xyz, 0.0)));\n" +
                     "   if(nearestNeighborColors){\n" +
                     "       if(coarseSize.x > 0 && coarseSize.x != fieldSize.x){\n" +
                     "           cellX0 = COARSE_INDEX_TO_FINE1(cellX0, fieldSize.x, coarseSize.x);\n" +
                     "           cellY0 = COARSE_INDEX_TO_FINE1(cellY0, fieldSize.y, coarseSize.y);\n" +
                     "       }\n" +
                     "       data = getFluidData(ivec2(cellX0, cellY0), fieldSizeM1);\n" +
-                    "       vertexColor = getColor(data);\n" + // no interpolation required
+                    "       vertexColor0 = getColor(data);\n" + // no interpolation required
                     "   } else {\n" +
                     "       fluidDataI = data;\n" +
                     "   }\n" +
                     "   uv = vec2(0.0);\n" +
                     "#endif\n" +
-                    "gl_Position = transform * vec4(finalPosition, 1.0);\n"
-        ).apply {
-            functions.add(getColorFunc)
-            functions.add(getPixelFunc)
-        }
+                    "finalPosition = matMul(localTransform, vec4(localPosition, 1.0));\n" +
+                    glPositionCode + motionVectorCode
+        ).add(getColorFunc).add(getPixelFunc)
     }
 
     override fun createFragmentStages(key: ShaderKey): List<ShaderStage> {
-
-        // copied from super mainly
-
-        val original = super.createFragmentStages(key)
-
-        val fragmentVariables = listOf(
-            Variable(GLSLType.V1B, "nearestNeighborColors", VariableMode.IN),
-            Variable(GLSLType.V4F, "fluidDataI", VariableMode.IN),
-            Variable(GLSLType.S2D, "colorMap"),
-            Variable(GLSLType.V2F, "colorMapScale"),
-            Variable(GLSLType.V4F, "visualMask"),
-            Variable(GLSLType.V1F, "visScale"),
-            Variable(GLSLType.V1I, "visualization"),
-            Variable(GLSLType.V1B, "halfTransparent")
+        return key.vertexData.onFragmentShader + listOf(
+            ShaderStage(
+                "material",
+                createFragmentVariables(key) + listOf(
+                    Variable(GLSLType.V4F, "cameraRotation"),
+                    Variable(GLSLType.S2D, "colorMap"),
+                    Variable(GLSLType.V2F, "colorMapScale"),
+                    Variable(GLSLType.V1I, "visualization"),
+                    Variable(GLSLType.V1F, "visScale"),
+                    Variable(GLSLType.V4F, "vertexColor0"),
+                    Variable(GLSLType.V4F, "fluidDataI"),
+                    Variable(GLSLType.V1B, "nearestNeighborColors"),
+                    Variable(GLSLType.V4F, "visualMask")
+                ),
+                concatDefines(key).toString() +
+                        discardByCullingPlane +
+                        // step by step define all material properties
+                        (if (key.flags.hasFlag(NEEDS_COLORS)) {
+                            "vec4 color = nearestNeighborColors ? vec4(vertexColor0.rgb, 1.0) : getColor(fluidDataI);\n" +
+                                    "finalColor = color.rgb;\n" +
+                                    "finalAlpha = color.a;\n" +
+                                    normalTanBitanCalculation +
+                                    normalMapCalculation +
+                                    emissiveCalculation +
+                                    occlusionCalculation +
+                                    metallicCalculation +
+                                    roughnessCalculation +
+                                    v0 + sheenCalculation +
+                                    clearCoatCalculation +
+                                    reflectionCalculation
+                        } else "") +
+                        finalMotionCalculation
+            ).add(quatRot).add(brightness).add(parallaxMapping).add(getReflectivity).add(getColorFunc)
         )
-
-        return original + ShaderStage(
-            "material", fragmentVariables, "" +
-                    "if(halfTransparent && (int(gl_FragCoord.x + gl_FragCoord.y) & 1) == 0) discard;\n" +
-                    "if(dot(vec4(finalPosition, 1.0), reflectionCullingPlane) < 0.0) discard;\n" +
-
-                    // step by step define all material properties
-                    "vec4 color = nearestNeighborColors ? vec4(vertexColor.rgb, 1.0) : getColor(fluidDataI);\n" +
-                    // "color *= diffuseBase * texture(diffuseMap, uv);\n" +
-                    // "if(color.a < ${1f / 255f}) discard;\n" +
-                    "finalColor = color.rgb;\n" +
-                    "finalAlpha = color.a;\n" +
-                    // "   vec3 finalNormal = normal;\n" +
-                    "finalTangent.xyz = normalize(tangent.xyz);\n" + // for debugging
-                    "finalNormal    = normalize(normal);\n" +
-                    "finalBitangent = normalize(cross(finalNormal, finalTangent));\n" +
-                    // bitangent: checked, correct transform
-                    // can be checked with a lot of rotated objects in all orientations,
-                    // and a shader with light from top/bottom
-                    "mat3 tbn = mat3(finalTangent, finalBitangent, finalNormal);\n" +
-                    "if(normalStrength.x > 0.0){\n" +
-                    "   vec3 normalFromTex = texture(normalMap, uv).rgb * 2.0 - 1.0;\n" +
-                    "        normalFromTex = tbn * normalFromTex;\n" +
-                    "   finalNormal = mix(finalNormal, normalFromTex, normalStrength.x);\n" +
-                    "}\n" +
-                    "finalEmissive  = texture(emissiveMap, uv).rgb * emissiveBase;\n" +
-                    "finalOcclusion = (1.0 - texture(occlusionMap, uv).r) * occlusionStrength;\n" +
-                    "finalMetallic  = mix(metallicMinMax.x,  metallicMinMax.y,  texture(metallicMap,  uv).r);\n" +
-                    "finalRoughness = mix(roughnessMinMax.x, roughnessMinMax.y, texture(roughnessMap, uv).r);\n" +
-
-                    // reflections
-                    // use roughness instead?
-                    // "   if(finalMetallic > 0.0) finalColor = mix(finalColor, texture(reflectionPlane,uv).rgb, finalMetallic);\n" +
-                    "if(hasReflectionPlane){\n" +
-                    "   float effect = dot(reflectionPlaneNormal,finalNormal) * (1.0 - finalRoughness);\n" +
-                    "   float factor = clamp((effect-.3)/.7, 0.0, 1.0);\n" +
-                    "   if(factor > 0.0){\n" +
-                    "       vec3 newColor = vec3(0.0);\n" +
-                    "       vec3 newEmissive = finalColor * texelFetch(reflectionPlane, ivec2(gl_FragCoord.xy), 0).rgb;\n" +
-                    // also multiply for mirror color <3
-                    "       finalEmissive = mix(finalEmissive, newEmissive, factor);\n" +
-                    // "       finalEmissive /= (1-finalEmissive);\n" + // only required, if tone mapping is applied
-                    "       finalColor = mix(finalColor, newColor, factor);\n" +
-                    // "       finalRoughness = 0;\n" +
-                    // "       finalMetallic = 0;\n" +
-                    "   }\n" +
-                    "};\n" +
-
-                    // sheen calculation
-                    "vec3 V0 = normalize(-finalPosition);\n" +
-                    "if(sheen > 0.0){\n" +
-                    "   vec3 sheenNormal = finalNormal;\n" +
-                    "   if(finalSheen * normalStrength.y > 0.0){\n" +
-                    "      vec3 normalFromTex = texture(sheenNormalMap, uv).rgb * 2.0 - 1.0;\n" +
-                    "           normalFromTex = tbn * normalFromTex;\n" +
-                    // original or transformed "finalNormal"? mmh...
-                    // transformed probably is better
-                    "      sheenNormal = mix(finalNormal, normalFromTex, normalStrength.y);\n" +
-                    "   }\n" +
-                    // calculate sheen
-                    "   float sheenFresnel = 1.0 - abs(dot(sheenNormal,V0));\n" +
-                    "   finalSheen = sheen * pow(sheenFresnel, 3.0);\n" +
-                    "} else finalSheen = 0.0;\n" +
-
-                    "if(finalClearCoat.w > 0.0){\n" +
-                    // cheap clear coat effect
-                    "   float fresnel = 1.0 - abs(dot(finalNormal,V0));\n" +
-                    "   float clearCoatEffect = pow(fresnel, 3.0) * finalClearCoat.w;\n" +
-                    "   finalRoughness = mix(finalRoughness, finalClearCoatRoughMetallic.x, clearCoatEffect);\n" +
-                    "   finalMetallic = mix(finalMetallic, finalClearCoatRoughMetallic.y, clearCoatEffect);\n" +
-                    "   finalColor = mix(finalColor, finalClearCoat.rgb, clearCoatEffect);\n" +
-                    "}\n"
-
-        ).apply { functions.add(getColorFunc) }
     }
 
     init {
