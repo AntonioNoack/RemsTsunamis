@@ -5,6 +5,7 @@ import me.anno.gpu.GFXState.useFrame
 import me.anno.gpu.buffer.SimpleBuffer
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
+import me.anno.gpu.framebuffer.TargetType
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.ShaderLib
 import me.anno.gpu.shader.ShaderLib.coordsList
@@ -89,8 +90,6 @@ object VideoRenderer {
             HiddenOpenGLContext.createOpenGL()
         }
 
-        ShaderLib.init()
-
         val engine = EngineType.create(engineType, w, h) as CPUEngine
 
         val maxMomentum = config["maxMomentum", 100f]
@@ -103,7 +102,7 @@ object VideoRenderer {
         val scaling = cflFactor / engine.computeMaxVelocity(gravity, minFluidHeight)
         val maxFluidHeight = getMaxValue(w, h, 1, engine.fluidHeight, engine.bathymetry)
 
-        val srcFB = Framebuffer("src", outputWidth, outputHeight, 1, 1, true, DepthBufferType.NONE)
+        val srcFB = Framebuffer("src", outputWidth, outputHeight, 1, TargetType.Float32x1, DepthBufferType.NONE)
         renderVideo(outputWidth, outputHeight, 30.0, desktop.getChild("height.mp4"), numFrames, srcFB, { _, callback ->
             for (i in 0 until numStepsPerFrame) {
                 engine.step(gravity, scaling, minFluidHeight)

@@ -34,20 +34,20 @@ object NetCDFImageCache : CacheSection("NetCDF-Images") {
     fun getData(file: FileReference, variableName: String?, async: Boolean): VariableImage? {
         return getFileEntry(file, false, 30_000, async) { file1, _ ->
             synchronized(NetCDFMutex) {
-                val c = Clock()
+                val c = Clock("NetCDFImageCache")
                 val data = loadFile(file1, false)
                 c.stop("Loading File")
                 val image = getData(data, variableName)
                 c.stop("Getting Data")
                 image
             }
-        } as? VariableImage
+        }
     }
 
     private fun getData(data: NetcdfFile?, variableName: String?): VariableImage? {
         data ?: return null
         synchronized(NetCDFMutex) {
-            val c = Clock()
+            val c = Clock("NetCDFImageCache")
             var variable = if (variableName != null) data.findVariable(variableName) else null
             if (variable == null) {
                 variable = data.variables.firstOrNull {

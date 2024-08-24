@@ -307,7 +307,6 @@ open class CPUEngine(width: Int, height: Int) : TsunamiEngine(width, height) {
         fluidTexture.setSize(cw, ch)
         val buffer = fbPool[fluidTexture.width * fluidTexture.height * 4, false, false]
         val data = createTextureData(width + 2, height + 2, cw + 2, ch + 2, this, buffer)
-        fluidTexture.autoUpdateMipmaps = false
         fluidTexture.createRGBA(data, false)
         fbPool.returnBuffer(buffer)
         return fluidTexture

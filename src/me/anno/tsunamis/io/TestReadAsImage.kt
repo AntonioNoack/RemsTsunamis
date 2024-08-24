@@ -8,7 +8,7 @@ import me.anno.utils.OS.desktop
 
 fun main() {
     OfficialExtensions.initForTests()
-    val c = Clock()
+    val c = Clock("TestReadAsImage")
     val src = getReference("E:/Documents/Uni/Master/WS2122/tohoku_gebco08_ucsb3_250m_bath.nc")
     c.stop("getReference")
     val inMemory = src.readBytesSync()

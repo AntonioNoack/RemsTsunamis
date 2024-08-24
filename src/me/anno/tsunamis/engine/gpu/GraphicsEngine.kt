@@ -6,6 +6,7 @@ import me.anno.gpu.GFXState.useFrame
 import me.anno.gpu.buffer.SimpleBuffer
 import me.anno.gpu.framebuffer.DepthBufferType
 import me.anno.gpu.framebuffer.Framebuffer
+import me.anno.gpu.framebuffer.TargetType
 import me.anno.gpu.shader.GLSLType
 import me.anno.gpu.shader.Shader
 import me.anno.gpu.shader.ShaderLib.coordsList
@@ -20,7 +21,7 @@ import me.anno.tsunamis.FluidSim
 import org.lwjgl.opengl.GL11
 
 class GraphicsEngine(width: Int, height: Int) : GPUEngine<Framebuffer>(width, height, { name ->
-    val buffer = Framebuffer(name, width, height, 1, 1, true, DepthBufferType.NONE)
+    val buffer = Framebuffer(name, width, height, 1, TargetType.Float32x1, DepthBufferType.NONE)
     initTextures(buffer)
     buffer
 }) {

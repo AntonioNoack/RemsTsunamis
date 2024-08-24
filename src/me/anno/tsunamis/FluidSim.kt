@@ -9,6 +9,7 @@ import me.anno.ecs.components.mesh.material.MaterialCache
 import me.anno.ecs.components.mesh.material.utils.TypeValue
 import me.anno.ecs.interfaces.CustomEditMode
 import me.anno.ecs.prefab.PrefabSaveable
+import me.anno.ecs.systems.OnUpdate
 import me.anno.engine.raycast.RayQuery
 import me.anno.engine.raycast.Raycast
 import me.anno.engine.raycast.RaycastMesh
@@ -51,7 +52,7 @@ import me.anno.ui.editor.PropertyInspector
 import me.anno.ui.editor.SettingCategory
 import me.anno.utils.ShutdownException
 import me.anno.utils.hpc.ProcessingGroup
-import me.anno.utils.hpc.ThreadLocal2
+import me.anno.utils.hpc.threadLocal
 import me.anno.utils.structures.lists.Lists.firstInstanceOrNull
 import org.apache.logging.log4j.LogManager
 import org.joml.*
@@ -62,7 +63,7 @@ import kotlin.math.min
 /**
  * simple 3d mesh, which simulates water
  * */
-class FluidSim : ProceduralMesh, CustomEditMode {
+class FluidSim : ProceduralMesh, CustomEditMode, OnUpdate {
 
     constructor()
 
@@ -466,7 +467,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         }
     }
 
-    override fun onUpdate(): Int {
+    override fun onUpdate() {
         if (ensureFieldSize()) {
             val bm = bathymetryMesh
             if (!hasValidBathymetryMesh && bm != null) {
@@ -507,7 +508,6 @@ class FluidSim : ProceduralMesh, CustomEditMode {
                 }
             }
         }
-        return 1 // update every tick
     }
 
     override fun generateMesh(mesh: Mesh) {
@@ -910,11 +910,11 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         super.createInspector(list, style, getGroup)
         val title = list.listOfAll.firstOrNull { it is TextPanel && it.text == "Color Map Scale" } as? TextPanel
         if (title != null) {
-            val group = title.listOfHierarchyReversed.firstInstanceOrNull<PanelListY>()
+            val group = title.listOfHierarchyReversed.firstInstanceOrNull(PanelListY::class)
             if (group != null) {
                 var indexInList = 0
-                title.listOfPanelHierarchy {
-                    if (it.uiParent === group) {
+                title.listOfHierarchy {
+                    if (it.parent === group) {
                         indexInList = it.indexInParent
                     }
                 }
@@ -1064,7 +1064,7 @@ class FluidSim : ProceduralMesh, CustomEditMode {
         }
 
         val threadPool = ProcessingGroup("TsunamiSim", 1f)
-        val tmpV4ByThread = ThreadLocal2 { FloatArray(4) }
+        val tmpV4ByThread = threadLocal { FloatArray(4) }
         private val defaultColorMap = getReference("res://colormaps/globe.xml")
         private val LOGGER = LogManager.getLogger(FluidSim::class)
         val f0 = FloatArray(0)

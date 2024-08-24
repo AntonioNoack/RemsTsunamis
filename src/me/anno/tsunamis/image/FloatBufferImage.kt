@@ -1,10 +1,11 @@
 package me.anno.tsunamis.image
 
+import me.anno.image.colormap.LinearColorMap
 import me.anno.image.raw.IFloatImage
 import java.nio.FloatBuffer
 
 class FloatBufferImage(width: Int, height: Int, channels: Int, val data: FloatBuffer) :
-    IFloatImage(width, height, channels) {
+    IFloatImage(width, height, channels, LinearColorMap.default) {
 
     override fun getValue(index: Int, channel: Int): Float {
         return data[index * numChannels + channel]

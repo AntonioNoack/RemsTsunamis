@@ -81,7 +81,6 @@ abstract class GPUEngine<Buffer>(
 
     companion object {
         fun initTextures(fb: Framebuffer) {
-            fb.autoUpdateMipmaps = false
             fb.ensure()
             for (tex in fb.textures ?: emptyList()) {
                 initTexture(tex)
@@ -89,7 +88,6 @@ abstract class GPUEngine<Buffer>(
         }
 
         fun initTexture(tex: Texture2D) {
-            tex.autoUpdateMipmaps = false
             tex.filtering = Filtering.TRULY_NEAREST
             tex.clamping = Clamping.CLAMP
         }

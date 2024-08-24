@@ -1,9 +1,10 @@
 package me.anno.tsunamis.image
 
+import me.anno.image.colormap.LinearColorMap
 import me.anno.image.raw.IFloatImage
 
 class CompositeFloatImage(width: Int, height: Int, private val channels: Array<FloatArray>) :
-    IFloatImage(width, height, channels.size) {
+    IFloatImage(width, height, channels.size, LinearColorMap.default) {
 
     override fun getValue(index: Int, channel: Int): Float {
         return channels[channel][index]

@@ -24,7 +24,7 @@ class VariableImage(variable: Variable) : Image(
 
     init {
 
-        val c = Clock()
+        val c = Clock("VariableImage")
         val shape = variable.shape
         val dataArray = if (shape.size <= 2) variable.read()
         else variable.read(

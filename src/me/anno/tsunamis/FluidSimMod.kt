@@ -6,16 +6,17 @@ import me.anno.extensions.mods.Mod
 import me.anno.image.Image
 import me.anno.image.ImageCache
 import me.anno.image.colormap.LinearColorMap
-import me.anno.io.Saveable.Companion.registerCustomClass
 import me.anno.io.files.FileReference
 import me.anno.io.files.Signature
 import me.anno.io.files.inner.InnerFolderCache
+import me.anno.io.saveable.Saveable.Companion.registerCustomClass
 import me.anno.io.utils.StringMap
 import me.anno.tsunamis.io.ColorMap
 import me.anno.tsunamis.io.NetCDFCache
 import me.anno.tsunamis.io.NetCDFImageCache
 import me.anno.tsunamis.setups.*
 import me.anno.utils.Color.black
+import me.anno.utils.OS.res
 import me.anno.utils.structures.Callback
 import java.io.InputStream
 
@@ -96,7 +97,7 @@ class FluidSimMod : Mod() {
 
         @JvmStatic
         fun main(args: Array<String>) {
-            ExtensionLoader.loadMainInfo()
+            ExtensionLoader.loadMainInfo(res.getChild("tsunami-ext.info"))
             registerCustomClass(StringMap())
             RemsEngine().run()
         }
